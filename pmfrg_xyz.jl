@@ -30,26 +30,110 @@ function setZero!(a::T) where T
     return a
 end
 
+### With Z2 x Z2 symmetry, only pairs of flavours are allowed
+### There are 3 homogenous ones, xxxx, yyyy, zzzz
+### and 3 x 2 x 3 = 18 mixed flavor combinations
+### namely aabb, abab, abba for 3 x 2 different flavor combinations
+### I label the vertex types ab1, ab2, ab3 according to the permutation type
 struct VertexType{T}
-    a::Array{T, 4}
-    b::Array{T, 4}
-    c::Array{T, 4}
+    xx::Array{T, 4}
+    yy::Array{T, 4}
+    zz::Array{T, 4}
+
+    xy1::Array{T, 4}
+    xy2::Array{T, 4}
+    xy3::Array{T, 4}
+
+    xz1::Array{T, 4}
+    xz2::Array{T, 4}
+    xz3::Array{T, 4}
+
+    yx1::Array{T, 4}
+    yx2::Array{T, 4}
+    yx3::Array{T, 4}
+    
+    yz1::Array{T, 4}
+    yz2::Array{T, 4}
+    yz3::Array{T, 4}
+    
+    zx1::Array{T, 4}
+    zx2::Array{T, 4}
+    zx3::Array{T, 4}
+
+    zy1::Array{T, 4}
+    zy2::Array{T, 4}
+    zy3::Array{T, 4}
+end
+
+### iSigma will now have 3 flavor indices
+struct SigmaType{T}
+    x::Array{T, 2}
+    y::Array{T, 2}
+    z::Array{T, 2}
 end
 
 struct BubbleType{T}
-    a::Array{T, 4}
-    b::Array{T, 4}
-    c::Array{T, 4}
+    xx::Array{T, 4}
+    yy::Array{T, 4}
+    zz::Array{T, 4}
 
-    Ta::Array{T, 4}
-    Tb::Array{T, 4}
-    Tc::Array{T, 4}
-    Td::Array{T, 4}
+    xy1::Array{T, 4}
+    xy2::Array{T, 4}
+    xy3::Array{T, 4}
+
+    xz1::Array{T, 4}
+    xz2::Array{T, 4}
+    xz3::Array{T, 4}
+
+    yx1::Array{T, 4}
+    yx2::Array{T, 4}
+    yx3::Array{T, 4}
+    
+    yz1::Array{T, 4}
+    yz2::Array{T, 4}
+    yz3::Array{T, 4}
+    
+    zx1::Array{T, 4}
+    zx2::Array{T, 4}
+    zx3::Array{T, 4}
+
+    zy1::Array{T, 4}
+    zy2::Array{T, 4}
+    zy3::Array{T, 4}
+
+    ### Tilde bubbles
+    Txx::Array{T, 4}
+    Tyy::Array{T, 4}
+    Tzz::Array{T, 4}
+
+    Txy1::Array{T, 4}
+    Txy2::Array{T, 4}
+    Txy3::Array{T, 4}
+
+    Txz1::Array{T, 4}
+    Txz2::Array{T, 4}
+    Txz3::Array{T, 4}
+
+    Tyx1::Array{T, 4}
+    Tyx2::Array{T, 4}
+    Tyx3::Array{T, 4}
+    
+    Tyz1::Array{T, 4}
+    Tyz2::Array{T, 4}
+    Tyz3::Array{T, 4}
+    
+    Tzx1::Array{T, 4}
+    Tzx2::Array{T, 4}
+    Tzx3::Array{T, 4}
+
+    Tzy1::Array{T, 4}
+    Tzy2::Array{T, 4}
+    Tzy3::Array{T, 4}
 end
 
 struct StateType{T}
     f_int::Array{T}         ### additional index in f, Sigma and Gamma for inequivalent sites (x in geometry package)
-    iSigma::Array{T, 2}
+    iSigma::SigmaType{T}
     Gamma::VertexType{T}
 end
 
@@ -90,17 +174,78 @@ function VertexType(VDims::Tuple)
     return VertexType(
         zeros(VDims),
         zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
+        zeros(VDims),
         zeros(VDims)
     )
 end
 VertexType(Par) = VertexType(getVDims(Par))
+
+function SigmaType(VDims::Tuple)
+    return SigmaType(
+        zeros(VDims[1], VDims[2]),
+        zeros(VDims[1], VDims[2]),
+        zeros(VDims[1], VDims[2])
+    )
+end
+SigmaType(Par) = SigmaType(getVdims(Par))
 
 function BubbleType(VDims::Tuple, type=Float64)
     return BubbleType(
         zeros(type, VDims),
         zeros(type, VDims),
         zeros(type, VDims),
-
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
+        zeros(type, VDims),
         zeros(type, VDims),
         zeros(type, VDims),
         zeros(type, VDims),
@@ -112,13 +257,13 @@ BubbleType(Par) = BubbleType(getVDims(Par))
 function StateType(NUnique::Int, N::Int, VDims::Tuple, type=Float64)
     return StateType(
         zeros(type, NUnique),
-        zeros(type, NUnique, N),
+        SigmaType(VDims),
         VertexType(VDims)
     )
 end
 StateType(Par) = StateType(Par.System.NUnique, Par.NumericalParams.N, getVDims(Par), _getFloatType(Par))
-StateType(f_int, iSigma, Gamma_a, Gamma_b, Gamma_c) = StateType(f_int, iSigma, VertexType(Gamma_a, Gamma_b, Gamma_c))
-RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma, x.Gamma.a, x.Gamma.b, x.Gamma.c)
+# StateType(f_int, iSigma, Gamma_a, Gamma_b, Gamma_c) = StateType(f_int, iSigma, VertexType(Gamma_a, Gamma_b, Gamma_c))
+# RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma, x.Gamma.a, x.Gamma.b, x.Gamma.c)
 StateType(Arr::ArrayPartition) = StateType(Arr.x...)
 
 function NumericalParams(;
