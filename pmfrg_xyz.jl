@@ -30,27 +30,39 @@ function setZero!(a::T) where T
     return a
 end
 
-struct VertexType{T}
-    a::Array{T, 4}
-    b::Array{T, 4}
-    c::Array{T, 4}
-end
+### A vertex will now be an Array{T, 5} with the first index
+### labelling the flavor
 
-struct BubbleType{T}
-    a::Array{T, 4}
-    b::Array{T, 4}
-    c::Array{T, 4}
+# struct VertexType{T}
+#     a::Array{T, 4}
+#     b::Array{T, 4}
+#     c::Array{T, 4}
+# end
 
-    Ta::Array{T, 4}
-    Tb::Array{T, 4}
-    Tc::Array{T, 4}
-    Td::Array{T, 4}
+### There will now be 24 Bubbles (yey!)
+### Also stored as an Array{T, 5}
+
+# struct BubbleType{T}
+#     a::Array{T, 4}
+#     b::Array{T, 4}
+#     c::Array{T, 4}
+
+#     Ta::Array{T, 4}
+#     Tb::Array{T, 4}
+#     Tc::Array{T, 4}
+#     Td::Array{T, 4}
+# end
+
+struct SigmaType{T}
+    x::Array{T, 2}
+    y::Array{T, 2}
+    z::Array{T, 2}
 end
 
 struct StateType{T}
     f_int::Array{T}         ### additional index in f, Sigma and Gamma for inequivalent sites (x in geometry package)
-    iSigma::Array{T, 2}
-    Gamma::VertexType{T}
+    iSigma::SigmaType{T}
+    Gamma::Array{T, 5}
 end
 
 struct NumericalParams
@@ -76,49 +88,58 @@ struct OneLoopParams
     Options::OptionParams
 end
 
-struct OneLoopWorkspace
-    State::StateType    ### Stores the current state
-    Deriv::StateType    ### Stores the derivative
-    X::BubbleType       ### Stores the bubble function X and XTilde
+struct OneLoopWorkspace{T}
+    State::StateType{T} ### Stores the current state
+    Deriv::StateType{T} ### Stores the derivative
+    X::Array{T, 5}      ### Stores the bubble function X and XTilde
     Par                 ### Params
 end
 
-getVDims(Par) = (Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
+getVDims(Par) = (21, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 _getFloatType(Par) = typeof(Par.NumericalParams.T)
 
-function VertexType(VDims::Tuple)
-    return VertexType(
-        zeros(VDims),
-        zeros(VDims),
-        zeros(VDims)
+# function VertexType(VDims::Tuple)
+#     return VertexType(
+#         zeros(VDims),
+#         zeros(VDims),
+#         zeros(VDims)
+#     )
+# end
+# VertexType(Par) = VertexType(getVDims(Par))
+
+# function BubbleType(VDims::Tuple, type=Float64)
+#     return BubbleType(
+#         zeros(type, VDims),
+#         zeros(type, VDims),
+#         zeros(type, VDims),
+
+#         zeros(type, VDims),
+#         zeros(type, VDims),
+#         zeros(type, VDims),
+#         zeros(type, VDims)
+#     )
+# end
+# BubbleType(Par) = BubbleType(getVDims(Par))
+
+function SigmaType(type=Float64, NUnique::Int, N::Int)
+    return SigmaType(
+        zeros(type, NUnique, N),
+        zeros(type, NUnique, N),
+        zeros(type, NUnique, N)
     )
 end
-VertexType(Par) = VertexType(getVDims(Par))
-
-function BubbleType(VDims::Tuple, type=Float64)
-    return BubbleType(
-        zeros(type, VDims),
-        zeros(type, VDims),
-        zeros(type, VDims),
-
-        zeros(type, VDims),
-        zeros(type, VDims),
-        zeros(type, VDims),
-        zeros(type, VDims)
-    )
-end
-BubbleType(Par) = BubbleType(getVDims(Par))
+SigmaType(Par) = SigmaType(Par.System.NPairs, Par.NumericalParams.N)
 
 function StateType(NUnique::Int, N::Int, VDims::Tuple, type=Float64)
     return StateType(
         zeros(type, NUnique),
-        zeros(type, NUnique, N),
-        VertexType(VDims)
+        SigmaType(tpye, NUnique, N),
+        zeros(type, VDims)
     )
 end
 StateType(Par) = StateType(Par.System.NUnique, Par.NumericalParams.N, getVDims(Par), _getFloatType(Par))
-StateType(f_int, iSigma, Gamma_a, Gamma_b, Gamma_c) = StateType(f_int, iSigma, VertexType(Gamma_a, Gamma_b, Gamma_c))
-RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma, x.Gamma.a, x.Gamma.b, x.Gamma.c)
+# StateType(f_int, iSigma, Gamma_a, Gamma_b, Gamma_c) = StateType(f_int, iSigma, VertexType(Gamma_a, Gamma_b, Gamma_c))
+RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma, x.Gamma)
 StateType(Arr::ArrayPartition) = StateType(Arr.x...)
 
 function NumericalParams(;
@@ -163,6 +184,10 @@ end
 #############################################################
 ######### PROPAGATORS ## PROPAGATORS ## PROPAGATORS #########
 #############################################################
+
+### Propagators will depend on an additional flavor
+### Instead of modifying the propagators, I will simply use them
+### as V_, by doing iG_(iSigma.x, ...)
 
 function get_w(nw, T)
     return pi * T * (2 * nw + 1)
@@ -220,10 +245,97 @@ function ConvertFreqArgs(ns, nt, nu, Nw)
     return ns, nt, nu, swapsites
 end
 
+using LinearAlgebra
+
 function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji::Integer, N::Integer)
+
+    ### Compute the matrices, lets say M is found
+    ### Then return M * Vertex[:, Rij, ns + 1, nt + 1, nu + 1]
+
+    MS_ = [
+        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
+        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
+        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
+        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
+    ]
+
+    MT_ = [
+        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### xy2
+        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### xz2
+        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### yx2
+        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### yz2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### zx2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### zy2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
+    ]
+
+    MU_ = [
+        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
+        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
+        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
+        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### xy3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### xz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### yx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0; ### yz3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### zx3
+        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### zy3
+    ]
+
+    FlavorTransform = Diagonal(ones(21))
+
+    if ns < 0
+        FlavorTransform .= MS_ * FlavorTransform
+    if nt < 0
+        FlavorTransform .= MT_ * FlavorTransform
+    if nu < 0
+        FlavorTransform .= MU_ * FlavorTransform
+
     ns, nt, nu, swapsites = ConvertFreqArgs(ns, nt, nu, N)
     Rij = ifelse(swapsites, Rji, Rij)
-    return Vertex[Rij, ns+1, nt+1, nu+1]
+    return FlavorTransform * Vertex[:, Rij, ns+1, nt+1, nu+1]
 end
 
 function mixedFrequencies(ns,nt,nu,nwpr)
