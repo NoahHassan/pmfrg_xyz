@@ -404,40 +404,41 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 		for k_spl in 1:Nsum[Rij]
 			#loop over all Nsum summation elements defined in geometry. This inner loop is responsible for most of the computational effort! 
 			ki,kj,m,xk = S_ki[k_spl,Rij],S_kj[k_spl,Rij],S_m[k_spl,Rij],S_xk[k_spl,Rij]
-			Ptm = Props[xk,xk]*m
+			Ptm = Props[xk,xk,:,:]*m ### Props now contains two flavor indices
 
             V12 = Vert(ki, s, wpw1, -wpw2)
             V34 = Vert(kj, s, -wmw3, -wmw4)
 
-            X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] - V12[fd_["xy1"]] * V34[fd_["yx1"]] - V12[fd_["xz1"]] * V34[fd_["zx1"]]
-            X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] - V12[fd_["yz1"]] * V34[fd_["zy1"]] - V12[fd_["yx1"]] * V34[fd_["xy1"]]
-            X_sum[fd_["zz"]] += -V12[fd_["zz"]] * V34[fd_["zz"]] - V12[fd_["zx1"]] * V34[fd_["xz1"]] - V12[fd_["zy1"]] * V34[fd_["yz1"]]
+            X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["xy1"]] * V34[fd_["yx1"]] * Ptm[2, 2] - V12[fd_["xz1"]] * V34[fd_["zx1"]] * Ptm[3, 3]
+            X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["yz1"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["yx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
+            X_sum[fd_["zz"]] += -V12[fd_["zz"]] * V34[fd_["zz"]] * Ptm[3, 3] - V12[fd_["zx1"]] * V34[fd_["xz1"]] * Ptm[1, 1] - V12[fd_["zy1"]] * V34[fd_["yz1"]] * Ptm[2, 2]
 
             ### Xab1 = -Vaa Vab1 - Vab1 Vbb - Vac1 Vcb1
-            X_sum[fd_["xy1"]] += -V12[fd_["xx"]] * V34[fd_["xy1"]] - V12[fd_["xy1"]] * V34[fd_["yy"]] - V12[fd_["xz1"]] * V34[fd_["zy1"]]
-            X_sum[fd_["xz1"]] += -V12[fd_["xx"]] * V34[fd_["xz1"]] - V12[fd_["xz1"]] * V34[fd_["zz"]] - V12[fd_["xy1"]] * V34[fd_["yz1"]]
-            X_sum[fd_["yx1"]] += -V12[fd_["yy"]] * V34[fd_["yx1"]] - V12[fd_["yx1"]] * V34[fd_["xx"]] - V12[fd_["yz1"]] * V34[fd_["zx1"]]
-            X_sum[fd_["yz1"]] += -V12[fd_["yy"]] * V34[fd_["yz1"]] - V12[fd_["yz1"]] * V34[fd_["zz"]] - V12[fd_["yx1"]] * V34[fd_["xz1"]]
-            X_sum[fd_["zx1"]] += -V12[fd_["zz"]] * V34[fd_["zx1"]] - V12[fd_["zx1"]] * V34[fd_["xx"]] - V12[fd_["zy1"]] * V34[fd_["yx1"]]
-            X_sum[fd_["zy1"]] += -V12[fd_["zz"]] * V34[fd_["zy1"]] - V12[fd_["zy1"]] * V34[fd_["yy"]] - V12[fd_["zx1"]] * V34[fd_["xy1"]]
+            X_sum[fd_["xy1"]] += -V12[fd_["xx"]] * V34[fd_["xy1"]] * Ptm[1, 1] - V12[fd_["xy1"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["xz1"]] * V34[fd_["zy1"]] * Ptm[3, 3]
+            X_sum[fd_["xz1"]] += -V12[fd_["xx"]] * V34[fd_["xz1"]] * Ptm[1, 1] - V12[fd_["xz1"]] * V34[fd_["zz"]] * Ptm[3, 3] - V12[fd_["xy1"]] * V34[fd_["yz1"]] * Ptm[2, 2]
+            X_sum[fd_["yx1"]] += -V12[fd_["yy"]] * V34[fd_["yx1"]] * Ptm[2, 2] - V12[fd_["yx1"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["yz1"]] * V34[fd_["zx1"]] * Ptm[3, 3]
+            X_sum[fd_["yz1"]] += -V12[fd_["yy"]] * V34[fd_["yz1"]] * Ptm[2, 2] - V12[fd_["yz1"]] * V34[fd_["zz"]] * Ptm[3, 3] - V12[fd_["yx1"]] * V34[fd_["xz1"]] * Ptm[1, 1]
+            X_sum[fd_["zx1"]] += -V12[fd_["zz"]] * V34[fd_["zx1"]] * Ptm[3, 3] - V12[fd_["zx1"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["zy1"]] * V34[fd_["yx1"]] * Ptm[2, 2]
+            X_sum[fd_["zy1"]] += -V12[fd_["zz"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["zy1"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["zx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
             
             ### Xab2 = -Vab3 Vab2 - Vab2 Vba3
-            X_sum[fd_["xy2"]] += -V12[fd_["xy3"]] * V34[fd_["xy2"]] - V12[fd_["xy2"]] * V34[fd_["yx3"]]
-            X_sum[fd_["xz2"]] += -V12[fd_["xz3"]] * V34[fd_["xz2"]] - V12[fd_["xz2"]] * V34[fd_["zx3"]]
-            X_sum[fd_["yx2"]] += -V12[fd_["yx3"]] * V34[fd_["yx2"]] - V12[fd_["yx2"]] * V34[fd_["xy3"]]
-            X_sum[fd_["yz2"]] += -V12[fd_["yz3"]] * V34[fd_["yz2"]] - V12[fd_["yz2"]] * V34[fd_["zy3"]]
-            X_sum[fd_["zx2"]] += -V12[fd_["zx3"]] * V34[fd_["zx2"]] - V12[fd_["zx2"]] * V34[fd_["xz3"]]
-            X_sum[fd_["zy2"]] += -V12[fd_["zy3"]] * V34[fd_["zy2"]] - V12[fd_["zy2"]] * V34[fd_["yz3"]]
+            X_sum[fd_["xy2"]] += -V12[fd_["xy3"]] * V34[fd_["xy2"]] * Ptm[2, 1] - V12[fd_["xy2"]] * V34[fd_["yx3"]] * Ptm[1, 2]
+            X_sum[fd_["xz2"]] += -V12[fd_["xz3"]] * V34[fd_["xz2"]] * Ptm[3, 1] - V12[fd_["xz2"]] * V34[fd_["zx3"]] * Ptm[1, 3]
+            X_sum[fd_["yx2"]] += -V12[fd_["yx3"]] * V34[fd_["yx2"]] * Ptm[1, 2] - V12[fd_["yx2"]] * V34[fd_["xy3"]] * Ptm[2, 1]
+            X_sum[fd_["yz2"]] += -V12[fd_["yz3"]] * V34[fd_["yz2"]] * Ptm[3, 2] - V12[fd_["yz2"]] * V34[fd_["zy3"]] * Ptm[2, 3]
+            X_sum[fd_["zx2"]] += -V12[fd_["zx3"]] * V34[fd_["zx2"]] * Ptm[1, 3] - V12[fd_["zx2"]] * V34[fd_["xz3"]] * Ptm[3, 1]
+            X_sum[fd_["zy2"]] += -V12[fd_["zy3"]] * V34[fd_["zy2"]] * Ptm[2, 3] - V12[fd_["zy2"]] * V34[fd_["yz3"]] * Ptm[3, 2]
 
             ### Xab3 = -Vab3 Vab3 - Vab2 Vba2
-            X_sum[fd_["xy3"]] += -V12[fd_["xy3"]] * V34[fd_["xy3"]] - V12[fd_["xy2"]] * V34[fd_["yx2"]]
-            X_sum[fd_["xz3"]] += -V12[fd_["xz3"]] * V34[fd_["xz3"]] - V12[fd_["xz2"]] * V34[fd_["zx2"]]
-            X_sum[fd_["yx3"]] += -V12[fd_["yx3"]] * V34[fd_["yx3"]] - V12[fd_["yx2"]] * V34[fd_["xy2"]]
-            X_sum[fd_["yz3"]] += -V12[fd_["yz3"]] * V34[fd_["yz3"]] - V12[fd_["yz2"]] * V34[fd_["zy2"]]
-            X_sum[fd_["zx3"]] += -V12[fd_["zx3"]] * V34[fd_["zx3"]] - V12[fd_["zx2"]] * V34[fd_["xz2"]]
-            X_sum[fd_["zy3"]] += -V12[fd_["zy3"]] * V34[fd_["zy3"]] - V12[fd_["zy2"]] * V34[fd_["yz2"]]
+            X_sum[fd_["xy3"]] += -V12[fd_["xy3"]] * V34[fd_["xy3"]] * Ptm[2, 1] - V12[fd_["xy2"]] * V34[fd_["yx2"]] * Ptm[1, 2]
+            X_sum[fd_["xz3"]] += -V12[fd_["xz3"]] * V34[fd_["xz3"]] * Ptm[3, 1] - V12[fd_["xz2"]] * V34[fd_["zx2"]] * Ptm[1, 3]
+            X_sum[fd_["yx3"]] += -V12[fd_["yx3"]] * V34[fd_["yx3"]] * Ptm[1, 2] - V12[fd_["yx2"]] * V34[fd_["xy2"]] * Ptm[2, 1]
+            X_sum[fd_["yz3"]] += -V12[fd_["yz3"]] * V34[fd_["yz3"]] * Ptm[3, 2] - V12[fd_["yz2"]] * V34[fd_["zy2"]] * Ptm[2, 3]
+            X_sum[fd_["zx3"]] += -V12[fd_["zx3"]] * V34[fd_["zx3"]] * Ptm[1, 3] - V12[fd_["zx2"]] * V34[fd_["xz2"]] * Ptm[3, 1]
+            X_sum[fd_["zy3"]] += -V12[fd_["zy3"]] * V34[fd_["zy3"]] * Ptm[2, 3] - V12[fd_["zy2"]] * V34[fd_["yz2"]] * Ptm[3, 2]
 
-			X_sum .*= Ptm ### attention. Something could go wrong here
+			# X_sum .*= Ptm ### attention. Something could go wrong here
+            # I KNEW IT!!!
 		end
 
 		X[:, Rij, is, it, iu] .+= X_sum ### same here
@@ -463,6 +464,14 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 		Rji = invpairs[Rij] # store pair corresponding to Rji (easiest case: Rji = Rij) 
 		(; xi, xj) = PairTypes[Rij]
 
+        function P_(n::Int, m::Int)
+            return Props[xi, xj, n, m]
+        end
+
+        function PT_(n::Int, m::Int)
+            return Props[xj, xi, m, n]
+        end
+
         V13 = Vert(Rij, -wmw1, nt, wmw3)
         V24 = Vert(Rij, wpw2, -nt, -wpw4) ### potential problems due to -nt?
 
@@ -474,195 +483,195 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t) 
 
         X_sum[21 + fd_["xx"], Rij, is, it, iu] += ( ### add 21 because this is X_sum[21 + n] = Y[n]
-            (V13[fd_["xx"]] * V24[fd_["xx"]]
-            + V13[fd_["xy2"]] * V24[fd_["xy2"]] 
-            + V13[fd_["xz2"]] * V24[fd_["xz2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+            (V13[fd_["xx"]] * V24[fd_["xx"]] * P_(1, 1)
+            + V13[fd_["xy2"]] * V24[fd_["xy2"]] * P_(2, 2) 
+            + V13[fd_["xz2"]] * V24[fd_["xz2"]] * P_(3, 3)) ### Blind-copied props, potentially wrong
         
-            + (V31[fd_["xx"]] * V42[fd_["xx"]]
-            + V31[fd_["xy2"]] * V42[fd_["xy2"]] 
-            + V31[fd_["xz2"]] * V42[fd_["xz2"]]) * Props[xj, xi]
+            + (V31[fd_["xx"]] * V42[fd_["xx"]] * PT_(1, 1)
+            + V31[fd_["xy2"]] * V42[fd_["xy2"]] * PT_(2, 2) 
+            + V31[fd_["xz2"]] * V42[fd_["xz2"]] * PT_(2, 2))
         )
 
         X_sum[21 + fd_["yy"], Rij, is, it, iu] += (
-            (V13[fd_["yy"]] * V24[fd_["yy"]]
-            + V13[fd_["yx2"]] * V24[fd_["yx2"]] 
-            + V13[fd_["yz2"]] * V24[fd_["yz2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+            (V13[fd_["yy"]] * V24[fd_["yy"]] * P_(2, 2)
+            + V13[fd_["yx2"]] * V24[fd_["yx2"]] * P_(1, 1)  
+            + V13[fd_["yz2"]] * V24[fd_["yz2"]] * P_(3, 3)) ### Blind-copied props, potentially wrong
         
-            + (V31[fd_["yy"]] * V42[fd_["yy"]]
-            + V31[fd_["yx2"]] * V42[fd_["yx2"]] 
-            + V31[fd_["yz2"]] * V42[fd_["yz2"]]) * Props[xj, xi]
+            + (V31[fd_["yy"]] * V42[fd_["yy"]] * PT_(2, 2)
+            + V31[fd_["yx2"]] * V42[fd_["yx2"]] * PT_(1, 1) 
+            + V31[fd_["yz2"]] * V42[fd_["yz2"]] * PT_(3, 3))
         )
 
         X_sum[21 + fd_["zz"], Rij, is, it, iu] += (
-            (V13[fd_["zz"]] * V24[fd_["zz"]]
-            + V13[fd_["zx2"]] * V24[fd_["zx2"]] 
-            + V13[fd_["zy2"]] * V24[fd_["zy2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+            (V13[fd_["zz"]] * V24[fd_["zz"]] * P_(3, 3)
+            + V13[fd_["zx2"]] * V24[fd_["zx2"]] * P_(1, 1) 
+            + V13[fd_["zy2"]] * V24[fd_["zy2"]] * P_(2, 2)) ### Blind-copied props, potentially wrong
         
-            + (V31[fd_["zz"]] * V42[fd_["zz"]]
-            + V31[fd_["zx2"]] * V42[fd_["zx2"]] 
-            + V31[fd_["zy2"]] * V42[fd_["zy2"]]) * Props[xj, xi]
+            + (V31[fd_["zz"]] * V42[fd_["zz"]] * PT_(3, 3)
+            + V31[fd_["zx2"]] * V42[fd_["zx2"]] * PT_(1, 1)
+            + V31[fd_["zy2"]] * V42[fd_["zy2"]] * PT_(2, 2))
         )
 
         ### Yab1 = Vab3 Vab3 + Vab1 Vab1 + (w -- -w + t)
 
         X_sum[21 + fd_["xy1"], Rij, is, it, iu] += (
-            (V13[fd_["xy3"]] * V24[fd_["xy3"]]
-            + V13[fd_["xy1"]] * V24[fd_["xy1"]]) * Props[xi, xj]
+            (V13[fd_["xy3"]] * V24[fd_["xy3"]] * P_(2, 1)
+            + V13[fd_["xy1"]] * V24[fd_["xy1"]] * P_(1, 2))
 
-            + (V31[fd_["xy3"]] * V42[fd_["xy3"]]
-            + V31[fd_["xy1"]] * V42[fd_["xy1"]]) * Props[xj, xi]
+            + (V31[fd_["xy3"]] * V42[fd_["xy3"]] * PT_(2, 1)
+            + V31[fd_["xy1"]] * V42[fd_["xy1"]] * PT_(1, 2))
         )
 
         X_sum[21 + fd_["xz1"], Rij, is, it, iu] += (
-            (V13[fd_["xz3"]] * V24[fd_["xz3"]]
-            + V13[fd_["xz1"]] * V24[fd_["xz1"]]) * Props[xi, xj]
+            (V13[fd_["xz3"]] * V24[fd_["xz3"]] * P_(3, 1)
+            + V13[fd_["xz1"]] * V24[fd_["xz1"]] * P_(1, 3))
 
-            + (V31[fd_["xz3"]] * V42[fd_["xz3"]]
-            + V31[fd_["xz1"]] * V42[fd_["xz1"]]) * Props[xj, xi]
+            + (V31[fd_["xz3"]] * V42[fd_["xz3"]] * PT_(3, 1)
+            + V31[fd_["xz1"]] * V42[fd_["xz1"]] * PT_(1, 3))
         )
 
         X_sum[21 + fd_["yx1"], Rij, is, it, iu] += (
-            (V13[fd_["yx3"]] * V24[fd_["yx3"]]
-            + V13[fd_["yx1"]] * V24[fd_["yx1"]]) * Props[xi, xj]
+            (V13[fd_["yx3"]] * V24[fd_["yx3"]] * P_(1, 2)
+            + V13[fd_["yx1"]] * V24[fd_["yx1"]] * P_(2, 1))
 
-            + (V31[fd_["yx3"]] * V42[fd_["yx3"]]
-            + V31[fd_["yx1"]] * V42[fd_["yx1"]]) * Props[xj, xi]
+            + (V31[fd_["yx3"]] * V42[fd_["yx3"]] * PT_(1, 2)
+            + V31[fd_["yx1"]] * V42[fd_["yx1"]] * PT_(2, 1))
         )
 
         X_sum[21 + fd_["yz1"], Rij, is, it, iu] += (
-            (V13[fd_["yz3"]] * V24[fd_["yz3"]]
-            + V13[fd_["yz1"]] * V24[fd_["yz1"]]) * Props[xi, xj]
+            (V13[fd_["yz3"]] * V24[fd_["yz3"]] * P_(3, 2)
+            + V13[fd_["yz1"]] * V24[fd_["yz1"]] * P_(2, 3))
 
-            + (V31[fd_["yz3"]] * V42[fd_["yz3"]]
-            + V31[fd_["yz1"]] * V42[fd_["yz1"]]) * Props[xj, xi]
+            + (V31[fd_["yz3"]] * V42[fd_["yz3"]] * PT_(3, 2)
+            + V31[fd_["yz1"]] * V42[fd_["yz1"]] * PT_(2, 3))
         )
 
         X_sum[21 + fd_["zx1"], Rij, is, it, iu] += (
-            (V13[fd_["zx3"]] * V24[fd_["zx3"]]
-            + V13[fd_["zx1"]] * V24[fd_["zx1"]]) * Props[xi, xj]
+            (V13[fd_["zx3"]] * V24[fd_["zx3"]] * P_(1, 3)
+            + V13[fd_["zx1"]] * V24[fd_["zx1"]] * P_(3, 1))
 
-            + (V31[fd_["zx3"]] * V42[fd_["zx3"]]
-            + V31[fd_["zx1"]] * V42[fd_["zx1"]]) * Props[xj, xi]
+            + (V31[fd_["zx3"]] * V42[fd_["zx3"]] * PT_(1, 3)
+            + V31[fd_["zx1"]] * V42[fd_["zx1"]] * PT_(3, 1))
         )
 
         X_sum[21 + fd_["zy1"], Rij, is, it, iu] += (
-            (V13[fd_["zy3"]] * V24[fd_["zy3"]]
-            + V13[fd_["zy1"]] * V24[fd_["zy1"]]) * Props[xi, xj]
+            (V13[fd_["zy3"]] * V24[fd_["zy3"]] * P_(2, 3)
+            + V13[fd_["zy1"]] * V24[fd_["zy1"]] * P_(3, 2))
 
-            + (V31[fd_["zy3"]] * V42[fd_["zy3"]]
-            + V31[fd_["zy1"]] * V42[fd_["zy1"]]) * Props[xj, xi]
+            + (V31[fd_["zy3"]] * V42[fd_["zy3"]] * PT_(2, 3)
+            + V31[fd_["zy1"]] * V42[fd_["zy1"]] * PT_(3, 2))
         )
 
         ### Yab2 = Vaa Vba2 + Vab2 Vbb + Vac2 Vbc2 + (w -- -w + t)
 
         X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
-            (V13[fd_["xx"]] * V24[fd_["yx2"]]
-            + V13[fd_["xy2"]] * V24[fd_["yy"]]
-            + V13[fd_["xz2"]] * V24[fd_["yz2"]]) * Props[xi, xj]
+            (V13[fd_["xx"]] * V24[fd_["yx2"]] * P_(1, 1)
+            + V13[fd_["xy2"]] * V24[fd_["yy"]] * P_(2, 2)
+            + V13[fd_["xz2"]] * V24[fd_["yz2"]] + P_(3, 3))
 
-            + (V31[fd_["xx"]] * V42[fd_["yx2"]]
-            + V31[fd_["xy2"]] * V42[fd_["yy"]]
-            + V31[fd_["xz2"]] * V42[fd_["yz2"]]) * Props[xj, xi]
+            + (V31[fd_["xx"]] * V42[fd_["yx2"]] * PT_(1, 1)
+            + V31[fd_["xy2"]] * V42[fd_["yy"]] * PT_(2, 2)
+            + V31[fd_["xz2"]] * V42[fd_["yz2"]] * PT_(3, 3))
         )
 
         X_sum[21 + fd_["xz2"], Rij, is, it, iu] += (
-            (V13[fd_["xx"]] * V24[fd_["zx2"]]
-            + V13[fd_["xz2"]] * V24[fd_["zz"]]
-            + V13[fd_["xy2"]] * V24[fd_["zy2"]]) * Props[xi, xj]
+            (V13[fd_["xx"]] * V24[fd_["zx2"]] * P_(1, 1)
+            + V13[fd_["xz2"]] * V24[fd_["zz"]] * P_(3, 3)
+            + V13[fd_["xy2"]] * V24[fd_["zy2"]] * P_(2, 2))
 
-            + (V31[fd_["xx"]] * V42[fd_["zx2"]]
-            + V31[fd_["xz2"]] * V42[fd_["zz"]]
-            + V31[fd_["xy2"]] * V42[fd_["zy2"]]) * Props[xj, xi]
+            + (V31[fd_["xx"]] * V42[fd_["zx2"]] * PT_(1, 1)
+            + V31[fd_["xz2"]] * V42[fd_["zz"]] * PT_(3, 3)
+            + V31[fd_["xy2"]] * V42[fd_["zy2"]] * PT_(2, 2))
         )
 
         X_sum[21 + fd_["yx2"], Rij, is, it, iu] += (
-            (V13[fd_["yy"]] * V24[fd_["xy2"]]
-            + V13[fd_["yx2"]] * V24[fd_["xx"]]
-            + V13[fd_["yz2"]] * V24[fd_["xz2"]]) * Props[xi, xj]
+            (V13[fd_["yy"]] * V24[fd_["xy2"]] * P_(2, 2)
+            + V13[fd_["yx2"]] * V24[fd_["xx"]] * P_(1, 1)
+            + V13[fd_["yz2"]] * V24[fd_["xz2"]] * P_(3, 3))
 
-            + (V31[fd_["yy"]] * V42[fd_["xy2"]]
-            + V31[fd_["yx2"]] * V42[fd_["xx"]]
-            + V31[fd_["yz2"]] * V42[fd_["xz2"]]) * Props[xj, xi]
+            + (V31[fd_["yy"]] * V42[fd_["xy2"]] * PT_(2, 2)
+            + V31[fd_["yx2"]] * V42[fd_["xx"]] * PT_(1, 1)
+            + V31[fd_["yz2"]] * V42[fd_["xz2"]] * PT_(3, 3))
         )
 
         X_sum[21 + fd_["yz2"], Rij, is, it, iu] += (
-            (V13[fd_["yy"]] * V24[fd_["zy2"]]
-            + V13[fd_["yz2"]] * V24[fd_["zz"]]
-            + V13[fd_["yx2"]] * V24[fd_["zx2"]]) * Props[xi, xj]
+            (V13[fd_["yy"]] * V24[fd_["zy2"]] * P_(2, 2)
+            + V13[fd_["yz2"]] * V24[fd_["zz"]] * P_(3, 3)
+            + V13[fd_["yx2"]] * V24[fd_["zx2"]] * P_(1, 1))
 
-            + (V31[fd_["yy"]] * V42[fd_["zy2"]]
-            + V31[fd_["yz2"]] * V42[fd_["zz"]]
-            + V31[fd_["yx2"]] * V42[fd_["zx2"]]) * Props[xj, xi]
+            + (V31[fd_["yy"]] * V42[fd_["zy2"]] * PT_(2, 2)
+            + V31[fd_["yz2"]] * V42[fd_["zz"]] * PT_(3, 3)
+            + V31[fd_["yx2"]] * V42[fd_["zx2"]] * PT_(1, 1))
         )
 
         X_sum[21 + fd_["zx2"], Rij, is, it, iu] += (
-            (V13[fd_["zz"]] * V24[fd_["xz2"]]
-            + V13[fd_["zx2"]] * V24[fd_["xx"]]
-            + V13[fd_["zy2"]] * V24[fd_["xy2"]]) * Props[xi, xj]
+            (V13[fd_["zz"]] * V24[fd_["xz2"]] * P_(3, 3)
+            + V13[fd_["zx2"]] * V24[fd_["xx"]] * P_(1, 1)
+            + V13[fd_["zy2"]] * V24[fd_["xy2"]] * P_(2, 2))
 
-            + (V31[fd_["zz"]] * V42[fd_["xz2"]]
-            + V31[fd_["zx2"]] * V42[fd_["xx"]]
-            + V31[fd_["zy2"]] * V42[fd_["xy2"]]) * Props[xj, xi]
+            + (V31[fd_["zz"]] * V42[fd_["xz2"]] * PT_(3, 3)
+            + V31[fd_["zx2"]] * V42[fd_["xx"]] * PT_(1, 1)
+            + V31[fd_["zy2"]] * V42[fd_["xy2"]] * PT_(2, 2))
         )
 
         X_sum[21 + fd_["zy2"], Rij, is, it, iu] += (
-            (V13[fd_["zz"]] * V24[fd_["yz2"]]
-            + V13[fd_["zy2"]] * V24[fd_["yy"]]
-            + V13[fd_["zx2"]] * V24[fd_["yx2"]]) * Props[xi, xj]
+            (V13[fd_["zz"]] * V24[fd_["yz2"]] * P_(3, 3)
+            + V13[fd_["zy2"]] * V24[fd_["yy"]] * P_(2, 2)
+            + V13[fd_["zx2"]] * V24[fd_["yx2"]] * P_(1, 1))
 
-            + (V13[fd_["zz"]] * V24[fd_["yz2"]]
-            + V13[fd_["zy2"]] * V24[fd_["yy"]]
-            + V13[fd_["zx2"]] * V24[fd_["yx2"]]) * Props[xj, xi]
+            + (V13[fd_["zz"]] * V24[fd_["yz2"]] * PT_(3, 3)
+            + V13[fd_["zy2"]] * V24[fd_["yy"]] * PT_(2, 2)
+            + V13[fd_["zx2"]] * V24[fd_["yx2"]] * PT_(1, 1))
         )
 
         ### Yab3 = Vab3 Vba1 + Vab1 Vba3 + (w -- -w + t)
 
         X_sum[21 + fd_["xy3"], Rij, is, it, iu] += (
-            (V13[fd_["xy3"]] * V24[fd_["yx1"]]
-            + V13[fd_["xy1"]] * V24[fd_["yx3"]]) * Props[xi, xj]
+            (V13[fd_["xy3"]] * V24[fd_["yx1"]] * P_(2, 1)
+            + V13[fd_["xy1"]] * V24[fd_["yx3"]] * P_(1, 2))
 
-            + (V31[fd_["xy3"]] * V42[fd_["yx1"]]
-            + V31[fd_["xy1"]] * V42[fd_["yx3"]]) * Props[xj, xi]
+            + (V31[fd_["xy3"]] * V42[fd_["yx1"]] * PT_(2, 1)
+            + V31[fd_["xy1"]] * V42[fd_["yx3"]] * PT_(1, 2)) 
         )
 
         X_sum[21 + fd_["xz3"], Rij, is, it, iu] += (
-            (V13[fd_["xz3"]] * V24[fd_["zx1"]]
-            + V13[fd_["xz1"]] * V24[fd_["zx3"]]) * Props[xi, xj]
+            (V13[fd_["xz3"]] * V24[fd_["zx1"]] * P_(3, 1)
+            + V13[fd_["xz1"]] * V24[fd_["zx3"]] * P_(1, 3)) 
 
-            + (V31[fd_["xz3"]] * V42[fd_["zx1"]]
-            + V31[fd_["xz1"]] * V42[fd_["zx3"]]) * Props[xj, xi]
+            + (V31[fd_["xz3"]] * V42[fd_["zx1"]] * PT_(3, 1)
+            + V31[fd_["xz1"]] * V42[fd_["zx3"]] * PT_(1, 3)) 
         )
 
         X_sum[21 + fd_["yx3"], Rij, is, it, iu] += (
-            (V13[fd_["yx3"]] * V24[fd_["xy1"]]
-            + V13[fd_["yx1"]] * V24[fd_["xy3"]]) * Props[xi, xj]
+            (V13[fd_["yx3"]] * V24[fd_["xy1"]] * P_(1, 2)
+            + V13[fd_["yx1"]] * V24[fd_["xy3"]] * P_(2, 1)) 
 
-            + (V31[fd_["yx3"]] * V42[fd_["xy1"]]
-            + V31[fd_["yx1"]] * V42[fd_["xy3"]]) * Props[xj, xi]
+            + (V31[fd_["yx3"]] * V42[fd_["xy1"]] * PT_(1, 2)
+            + V31[fd_["yx1"]] * V42[fd_["xy3"]] * PT_(2, 1)) 
         )
 
         X_sum[21 + fd_["yz3"], Rij, is, it, iu] += (
-            (V13[fd_["yz3"]] * V24[fd_["zy1"]]
-            + V13[fd_["yz1"]] * V24[fd_["zy3"]]) * Props[xi, xj]
+            (V13[fd_["yz3"]] * V24[fd_["zy1"]] * P_(3, 2)
+            + V13[fd_["yz1"]] * V24[fd_["zy3"]] * P_(2, 3)) 
 
-            + (V31[fd_["yz3"]] * V42[fd_["zy1"]]
-            + V31[fd_["yz1"]] * V42[fd_["zy3"]]) * Props[xj, xi]
+            + (V31[fd_["yz3"]] * V42[fd_["zy1"]] * PT_(3, 2)
+            + V31[fd_["yz1"]] * V42[fd_["zy3"]] * PT_(2, 3)) 
         )
 
         X_sum[21 + fd_["zx3"], Rij, is, it, iu] += (
-            (V13[fd_["zx3"]] * V24[fd_["xz1"]]
-            + V13[fd_["zx1"]] * V24[fd_["xz3"]]) * Props[xi, xj]
+            (V13[fd_["zx3"]] * V24[fd_["xz1"]] * P_(1, 3)
+            + V13[fd_["zx1"]] * V24[fd_["xz3"]] * P_(3, 1)) 
 
-            + (V31[fd_["zx3"]] * V42[fd_["xz1"]]
-            + V31[fd_["zx1"]] * V42[fd_["xz3"]]) * Props[xj, xi]
+            + (V31[fd_["zx3"]] * V42[fd_["xz1"]] * PT_(1, 3)
+            + V31[fd_["zx1"]] * V42[fd_["xz3"]] * PT_(3, 1)) 
         )
 
         X_sum[21 + fd_["zy3"], Rij, is, it, iu] += (
-            (V13[fd_["zy3"]] * V24[fd_["yz1"]]
-            + V13[fd_["zy1"]] * V24[fd_["yz3"]]) * Props[xi, xj]
+            (V13[fd_["zy3"]] * V24[fd_["yz1"]] * P_(2, 3)
+            + V13[fd_["zy1"]] * V24[fd_["yz3"]] * P_(3, 2)) 
 
-            + (V31[fd_["zy3"]] * V42[fd_["yz1"]]
-            + V31[fd_["zy1"]] * V42[fd_["yz3"]]) * Props[xj, xi]
+            + (V31[fd_["zy3"]] * V42[fd_["yz1"]] * PT_(2, 3)
+            + V31[fd_["zy1"]] * V42[fd_["yz3"]] * PT_(3, 2)) 
         )
 
         X .+= X_sum
