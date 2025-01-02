@@ -346,24 +346,51 @@ function mixedFrequencies(ns,nt,nu,nwpr)
 
 	wpw1 = nwpr + nw1 + 1
     wpw2 = nwpr + nw2 + 1
+    wpw3 = nwpr + nw3 + 1
+    wpw4 = nwpr + nw4 + 1
+    wmw1 = nwpr - nw1
+    wmw2 = nwpr - nw2
     wmw3 = nwpr - nw3
     wmw4 = nwpr - nw4
 
-	return wpw1, wpw2, wmw3, wmw4
+	return wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4
 end
 
+fd_ = Dict(
+    "xx" => 1,
+    "yy" => 2,
+    "zz" => 3,
+    "xy1" => 4,
+    "xz1" => 5,
+    "yx1" => 6,
+    "yz1" => 7,
+    "zx1" => 8,
+    "zy1" => 9,
+    "xy2" => 10,
+    "xz2" => 11,
+    "yx2" => 12,
+    "yz2" => 13,
+    "zx2" => 14,
+    "zy2" => 15,
+    "xy3" => 16,
+    "xz3" => 17,
+    "yx3" => 18,
+    "yz3" => 19,
+    "zx3" => 20,
+    "zy3" => 21
+)
+
+### The X bubble containing the k sum
 function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
 	(; State, X, Par) = Workspace
 	N = Par.NumericalParams.N
 	(; Npairs, Nsum, siteSum, invpairs) = Par.System
 
-    Va_(Rij,s,t,u) = V_(State.Gamma.a, s, t, u, Rij, invpairs[Rij], N)
-	Vb_(Rij,s,t,u) = V_(State.Gamma.b, s, t, u, Rij, invpairs[Rij], N)
-	Vc_(Rij,s,t,u) = V_(State.Gamma.c, s, t, u, Rij, invpairs[Rij], N)
+    Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N)
 	ns = is - 1 ### because julia indexes from 1
 	nt = it - 1
 	nu = iu - 1
-	wpw1, wpw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
+	wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
 
 	# get fields of siteSum struct as Matrices for better use of LoopVectorization
 	S_ki = siteSum.ki
@@ -373,119 +400,272 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 
 	for Rij in 1:Npairs
 		#loop over all left hand side inequivalent pairs Rij
-		Xa_sum = 0. #Perform summation on this temp variable before writing to State array as Base.setindex! proved to be a bottleneck!
-		Xb_sum = 0.
-		Xc_sum = 0.
+        X_sum = zeros(42)
 		for k_spl in 1:Nsum[Rij]
 			#loop over all Nsum summation elements defined in geometry. This inner loop is responsible for most of the computational effort! 
 			ki,kj,m,xk = S_ki[k_spl,Rij],S_kj[k_spl,Rij],S_m[k_spl,Rij],S_xk[k_spl,Rij]
 			Ptm = Props[xk,xk]*m
 
-            Va12 = Va_(ki, ns, wpw1, wpw2)
-            Vb12 = Vb_(ki, ns, wpw1, wpw2)
-            Vc12 = Vc_(ki, ns, wpw1, wpw2)
+            V12 = Vert(ki, s, wpw1, -wpw2)
+            V34 = Vert(kj, s, -wmw3, -wmw4)
 
-            Va34 = Va_(kj, ns, wmw3, wmw4)
-            Vb34 = Vb_(kj, ns, wmw3, wmw4)
-            Vc34 = Vc_(kj, ns, wmw3, wmw4)
+            X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] - V12[fd_["xy1"]] * V34[fd_["yx1"]] - V12[fd_["xz1"]] * V34[fd_["zx1"]]
+            X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] - V12[fd_["yz1"]] * V34[fd_["zy1"]] - V12[fd_["yx1"]] * V34[fd_["xy1"]]
+            X_sum[fd_["zz"]] += -V12[fd_["zz"]] * V34[fd_["zz"]] - V12[fd_["zx1"]] * V34[fd_["xz1"]] - V12[fd_["zy1"]] * V34[fd_["yz1"]]
 
-            Vc21 = Vc_(ki, ns, wpw2, wpw1)
-            Vc43 = Vc_(kj, ns, wmw4, wmw3)
+            ### Xab1 = -Vaa Vab1 - Vab1 Vbb - Vac1 Vcb1
+            X_sum[fd_["xy1"]] += -V12[fd_["xx"]] * V34[fd_["xy1"]] - V12[fd_["xy1"]] * V34[fd_["yy"]] - V12[fd_["xz1"]] * V34[fd_["zy1"]]
+            X_sum[fd_["xz1"]] += -V12[fd_["xx"]] * V34[fd_["xz1"]] - V12[fd_["xz1"]] * V34[fd_["zz"]] - V12[fd_["xy1"]] * V34[fd_["yz1"]]
+            X_sum[fd_["yx1"]] += -V12[fd_["yy"]] * V34[fd_["yx1"]] - V12[fd_["yx1"]] * V34[fd_["xx"]] - V12[fd_["yz1"]] * V34[fd_["zx1"]]
+            X_sum[fd_["yz1"]] += -V12[fd_["yy"]] * V34[fd_["yz1"]] - V12[fd_["yz1"]] * V34[fd_["zz"]] - V12[fd_["yx1"]] * V34[fd_["xz1"]]
+            X_sum[fd_["zx1"]] += -V12[fd_["zz"]] * V34[fd_["zx1"]] - V12[fd_["zx1"]] * V34[fd_["xx"]] - V12[fd_["zy1"]] * V34[fd_["yx1"]]
+            X_sum[fd_["zy1"]] += -V12[fd_["zz"]] * V34[fd_["zy1"]] - V12[fd_["zy1"]] * V34[fd_["yy"]] - V12[fd_["zx1"]] * V34[fd_["xy1"]]
+            
+            ### Xab2 = -Vab3 Vab2 - Vab2 Vba3
+            X_sum[fd_["xy2"]] += -V12[fd_["xy3"]] * V34[fd_["xy2"]] - V12[fd_["xy2"]] * V34[fd_["yx3"]]
+            X_sum[fd_["xz2"]] += -V12[fd_["xz3"]] * V34[fd_["xz2"]] - V12[fd_["xz2"]] * V34[fd_["zx3"]]
+            X_sum[fd_["yx2"]] += -V12[fd_["yx3"]] * V34[fd_["yx2"]] - V12[fd_["yx2"]] * V34[fd_["xy3"]]
+            X_sum[fd_["yz2"]] += -V12[fd_["yz3"]] * V34[fd_["yz2"]] - V12[fd_["yz2"]] * V34[fd_["zy3"]]
+            X_sum[fd_["zx2"]] += -V12[fd_["zx3"]] * V34[fd_["zx2"]] - V12[fd_["zx2"]] * V34[fd_["xz3"]]
+            X_sum[fd_["zy2"]] += -V12[fd_["zy3"]] * V34[fd_["zy2"]] - V12[fd_["zy2"]] * V34[fd_["yz3"]]
 
-			Xa_sum += (
-				+Va12 * Va34 
-				+Vb12 * Vb34 * 2
-			)* Ptm
+            ### Xab3 = -Vab3 Vab3 - Vab2 Vba2
+            X_sum[fd_["xy3"]] += -V12[fd_["xy3"]] * V34[fd_["xy3"]] - V12[fd_["xy2"]] * V34[fd_["yx2"]]
+            X_sum[fd_["xz3"]] += -V12[fd_["xz3"]] * V34[fd_["xz3"]] - V12[fd_["xz2"]] * V34[fd_["zx2"]]
+            X_sum[fd_["yx3"]] += -V12[fd_["yx3"]] * V34[fd_["yx3"]] - V12[fd_["yx2"]] * V34[fd_["xy2"]]
+            X_sum[fd_["yz3"]] += -V12[fd_["yz3"]] * V34[fd_["yz3"]] - V12[fd_["yz2"]] * V34[fd_["zy2"]]
+            X_sum[fd_["zx3"]] += -V12[fd_["zx3"]] * V34[fd_["zx3"]] - V12[fd_["zx2"]] * V34[fd_["xz2"]]
+            X_sum[fd_["zy3"]] += -V12[fd_["zy3"]] * V34[fd_["zy3"]] - V12[fd_["zy2"]] * V34[fd_["yz2"]]
 
-			Xb_sum += (
-				+Va12 * Vb34
-				+Vb12 * Va34
-				+Vb12 * Vb34
-			)* Ptm
-			
-			Xc_sum += (
-				+Vc12 * Vc34
-				+Vc21 * Vc43
-			)* Ptm
+			X_sum .*= Ptm ### attention. Something could go wrong here
 		end
-		X.a[Rij,is,it,iu] += Xa_sum
-		X.b[Rij,is,it,iu] += Xb_sum
-		X.c[Rij,is,it,iu] += Xc_sum
+
+		X[:, Rij, is, it, iu] .+= X_sum ### same here
     end
     return
 end
 
-function addXTilde!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
+function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
 	(; State, X, Par) = Workspace
 	N = Par.NumericalParams.N
 	(; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
 
-    Va_(Rij,s,t,u) = V_(State.Gamma.a, s, t, u, Rij, invpairs[Rij], N)
-	Vb_(Rij,s,t,u) = V_(State.Gamma.b, s, t, u, Rij, invpairs[Rij], N)
-	Vc_(Rij,s,t,u) = V_(State.Gamma.c, s, t, u, Rij, invpairs[Rij], N)
+    Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N)
 	ns = is - 1 ### because julia indexes from 1
 	nt = it - 1
 	nu = iu - 1
-	wpw1, wpw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
+	wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
 
 	# Xtilde only defined for nonlocal pairs Rij != Rii
 	for Rij in 1:Npairs
 		Rij in OnsitePairs && continue
 		# loop over all left hand side inequivalent pairs Rij
-		Rji = invpairs[Rij] # store pair corresponding to Rji (easiest case: Rji = Rij)
+		Rji = invpairs[Rij] # store pair corresponding to Rji (easiest case: Rji = Rij) 
 		(; xi, xj) = PairTypes[Rij]
 
-		# These values are used several times so they are saved locally
-		Va12 = Va_(Rji, wpw1, ns, wpw2)
-		Va21 = Va_(Rij, wpw2, ns, wpw1)
-		Va34 = Va_(Rji, wmw3, ns, wmw4)
-		Va43 = Va_(Rij, wmw4, ns, wmw3)
+        V13 = Vert(Rij, -wmw1, nt, wmw3)
+        V24 = Vert(Rij, wpw2, -nt, -wpw4) ### potential problems due to -nt?
 
-		Vb12 = Vb_(Rji, wpw1, ns, wpw2)
-		Vb21 = Vb_(Rij, wpw2, ns, wpw1)
-		Vb34 = Vb_(Rji, wmw3, ns, wmw4)
-		Vb43 = Vb_(Rij, wmw4, ns, wmw3)
+        V31 = Vert(Rij, wmw3, nt, -wmw1)
+        V42 = Vert(Rij, -wpw4, -nt, wpw2)
 
-		Vc12 = Vc_(Rji, wpw1, ns, wpw2)
-		Vc21 = Vc_(Rij, wpw2, ns, wpw1)
-		Vc34 = Vc_(Rji, wmw3, ns, wmw4)
-		Vc43 = Vc_(Rij, wmw4, ns, wmw3)
+        X_sum = zeros(42)
 
-	    X.Ta[Rij,is,it,iu] += (
-			(+Va21 * Va43
-			+2*Vc21 * Vc43) * Props[xi,xj]
-			+(Va12 * Va34
-			+2*Vc12 * Vc34)* Props[xj,xi]
-		)
-		
-	    X.Tb[Rij,is,it,iu] += (
-			(+Va21 * Vc43
-			+Vc21 * Vc43
-			+Vc21 * Va43) * Props[xi,xj]
+        ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t) 
 
-			+(Va12 * Vc34
-			+Vc12 * Vc34
-			+Vc12 * Va34)* Props[xj,xi]
-		)
-		Vb12 = Vb_(Rji, wpw1, wpw2, ns)
-		Vb21 = Vb_(Rij, wpw2, wpw1, ns)
-		Vb34 = Vb_(Rji, wmw3, wmw4, ns)
-		Vb43 = Vb_(Rij, wmw4, wmw3, ns)
+        X_sum[21 + fd_["xx"], Rij, is, it, iu] += ( ### add 21 because this is X_sum[21 + n] = Y[n]
+            (V13[fd_["xx"]] * V24[fd_["xx"]]
+            + V13[fd_["xy2"]] * V24[fd_["xy2"]] 
+            + V13[fd_["xz2"]] * V24[fd_["xz2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+        
+            + (V31[fd_["xx"]] * V42[fd_["xx"]]
+            + V31[fd_["xy2"]] * V42[fd_["xy2"]] 
+            + V31[fd_["xz2"]] * V42[fd_["xz2"]]) * Props[xj, xi]
+        )
 
-		Vc12 = Vc_(Rji, wpw1, wpw2, ns)
-		Vc21 = Vc_(Rij, wpw2, wpw1, ns)
-		Vc34 = Vc_(Rji, wmw3, wmw4, ns)
-		Vc43 = Vc_(Rij, wmw4, wmw3, ns)
+        X_sum[21 + fd_["yy"], Rij, is, it, iu] += (
+            (V13[fd_["yy"]] * V24[fd_["yy"]]
+            + V13[fd_["yx2"]] * V24[fd_["yx2"]] 
+            + V13[fd_["yz2"]] * V24[fd_["yz2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+        
+            + (V31[fd_["yy"]] * V42[fd_["yy"]]
+            + V31[fd_["yx2"]] * V42[fd_["yx2"]] 
+            + V31[fd_["yz2"]] * V42[fd_["yz2"]]) * Props[xj, xi]
+        )
 
+        X_sum[21 + fd_["zz"], Rij, is, it, iu] += (
+            (V13[fd_["zz"]] * V24[fd_["zz"]]
+            + V13[fd_["zx2"]] * V24[fd_["zx2"]] 
+            + V13[fd_["zy2"]] * V24[fd_["zy2"]]) * Props[xi, xj] ### Blind-copied props, potentially wrong
+        
+            + (V31[fd_["zz"]] * V42[fd_["zz"]]
+            + V31[fd_["zx2"]] * V42[fd_["zx2"]] 
+            + V31[fd_["zy2"]] * V42[fd_["zy2"]]) * Props[xj, xi]
+        )
 
-	    X.Tc[Rij,is,it,iu] += (
-			(+Vb21 * Vb43
-			+Vc21 * Vc43
-			) * Props[xi,xj]
-			+(Vb12 * Vb34
-			+Vc12 * Vc34
-	    	)* Props[xj,xi]
-		)
+        ### Yab1 = Vab3 Vab3 + Vab1 Vab1 + (w -- -w + t)
+
+        X_sum[21 + fd_["xy1"], Rij, is, it, iu] += (
+            (V13[fd_["xy3"]] * V24[fd_["xy3"]]
+            + V13[fd_["xy1"]] * V24[fd_["xy1"]]) * Props[xi, xj]
+
+            + (V31[fd_["xy3"]] * V42[fd_["xy3"]]
+            + V31[fd_["xy1"]] * V42[fd_["xy1"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["xz1"], Rij, is, it, iu] += (
+            (V13[fd_["xz3"]] * V24[fd_["xz3"]]
+            + V13[fd_["xz1"]] * V24[fd_["xz1"]]) * Props[xi, xj]
+
+            + (V31[fd_["xz3"]] * V42[fd_["xz3"]]
+            + V31[fd_["xz1"]] * V42[fd_["xz1"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yx1"], Rij, is, it, iu] += (
+            (V13[fd_["yx3"]] * V24[fd_["yx3"]]
+            + V13[fd_["yx1"]] * V24[fd_["yx1"]]) * Props[xi, xj]
+
+            + (V31[fd_["yx3"]] * V42[fd_["yx3"]]
+            + V31[fd_["yx1"]] * V42[fd_["yx1"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yz1"], Rij, is, it, iu] += (
+            (V13[fd_["yz3"]] * V24[fd_["yz3"]]
+            + V13[fd_["yz1"]] * V24[fd_["yz1"]]) * Props[xi, xj]
+
+            + (V31[fd_["yz3"]] * V42[fd_["yz3"]]
+            + V31[fd_["yz1"]] * V42[fd_["yz1"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zx1"], Rij, is, it, iu] += (
+            (V13[fd_["zx3"]] * V24[fd_["zx3"]]
+            + V13[fd_["zx1"]] * V24[fd_["zx1"]]) * Props[xi, xj]
+
+            + (V31[fd_["zx3"]] * V42[fd_["zx3"]]
+            + V31[fd_["zx1"]] * V42[fd_["zx1"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zy1"], Rij, is, it, iu] += (
+            (V13[fd_["zy3"]] * V24[fd_["zy3"]]
+            + V13[fd_["zy1"]] * V24[fd_["zy1"]]) * Props[xi, xj]
+
+            + (V31[fd_["zy3"]] * V42[fd_["zy3"]]
+            + V31[fd_["zy1"]] * V42[fd_["zy1"]]) * Props[xj, xi]
+        )
+
+        ### Yab2 = Vaa Vba2 + Vab2 Vbb + Vac2 Vbc2 + (w -- -w + t)
+
+        X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
+            (V13[fd_["xx"]] * V24[fd_["yx2"]]
+            + V13[fd_["xy2"]] * V24[fd_["yy"]]
+            + V13[fd_["xz2"]] * V24[fd_["yz2"]]) * Props[xi, xj]
+
+            + (V31[fd_["xx"]] * V42[fd_["yx2"]]
+            + V31[fd_["xy2"]] * V42[fd_["yy"]]
+            + V31[fd_["xz2"]] * V42[fd_["yz2"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["xz2"], Rij, is, it, iu] += (
+            (V13[fd_["xx"]] * V24[fd_["zx2"]]
+            + V13[fd_["xz2"]] * V24[fd_["zz"]]
+            + V13[fd_["xy2"]] * V24[fd_["zy2"]]) * Props[xi, xj]
+
+            + (V31[fd_["xx"]] * V42[fd_["zx2"]]
+            + V31[fd_["xz2"]] * V42[fd_["zz"]]
+            + V31[fd_["xy2"]] * V42[fd_["zy2"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yx2"], Rij, is, it, iu] += (
+            (V13[fd_["yy"]] * V24[fd_["xy2"]]
+            + V13[fd_["yx2"]] * V24[fd_["xx"]]
+            + V13[fd_["yz2"]] * V24[fd_["xz2"]]) * Props[xi, xj]
+
+            + (V31[fd_["yy"]] * V42[fd_["xy2"]]
+            + V31[fd_["yx2"]] * V42[fd_["xx"]]
+            + V31[fd_["yz2"]] * V42[fd_["xz2"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yz2"], Rij, is, it, iu] += (
+            (V13[fd_["yy"]] * V24[fd_["zy2"]]
+            + V13[fd_["yz2"]] * V24[fd_["zz"]]
+            + V13[fd_["yx2"]] * V24[fd_["zx2"]]) * Props[xi, xj]
+
+            + (V31[fd_["yy"]] * V42[fd_["zy2"]]
+            + V31[fd_["yz2"]] * V42[fd_["zz"]]
+            + V31[fd_["yx2"]] * V42[fd_["zx2"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zx2"], Rij, is, it, iu] += (
+            (V13[fd_["zz"]] * V24[fd_["xz2"]]
+            + V13[fd_["zx2"]] * V24[fd_["xx"]]
+            + V13[fd_["zy2"]] * V24[fd_["xy2"]]) * Props[xi, xj]
+
+            + (V31[fd_["zz"]] * V42[fd_["xz2"]]
+            + V31[fd_["zx2"]] * V42[fd_["xx"]]
+            + V31[fd_["zy2"]] * V42[fd_["xy2"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zy2"], Rij, is, it, iu] += (
+            (V13[fd_["zz"]] * V24[fd_["yz2"]]
+            + V13[fd_["zy2"]] * V24[fd_["yy"]]
+            + V13[fd_["zx2"]] * V24[fd_["yx2"]]) * Props[xi, xj]
+
+            + (V13[fd_["zz"]] * V24[fd_["yz2"]]
+            + V13[fd_["zy2"]] * V24[fd_["yy"]]
+            + V13[fd_["zx2"]] * V24[fd_["yx2"]]) * Props[xj, xi]
+        )
+
+        ### Yab3 = Vab3 Vba1 + Vab1 Vba3 + (w -- -w + t)
+
+        X_sum[21 + fd_["xy3"], Rij, is, it, iu] += (
+            (V13[fd_["xy3"]] * V24[fd_["yx1"]]
+            + V13[fd_["xy1"]] * V24[fd_["yx3"]]) * Props[xi, xj]
+
+            + (V31[fd_["xy3"]] * V42[fd_["yx1"]]
+            + V31[fd_["xy1"]] * V42[fd_["yx3"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["xz3"], Rij, is, it, iu] += (
+            (V13[fd_["xz3"]] * V24[fd_["zx1"]]
+            + V13[fd_["xz1"]] * V24[fd_["zx3"]]) * Props[xi, xj]
+
+            + (V31[fd_["xz3"]] * V42[fd_["zx1"]]
+            + V31[fd_["xz1"]] * V42[fd_["zx3"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yx3"], Rij, is, it, iu] += (
+            (V13[fd_["yx3"]] * V24[fd_["xy1"]]
+            + V13[fd_["yx1"]] * V24[fd_["xy3"]]) * Props[xi, xj]
+
+            + (V31[fd_["yx3"]] * V42[fd_["xy1"]]
+            + V31[fd_["yx1"]] * V42[fd_["xy3"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["yz3"], Rij, is, it, iu] += (
+            (V13[fd_["yz3"]] * V24[fd_["zy1"]]
+            + V13[fd_["yz1"]] * V24[fd_["zy3"]]) * Props[xi, xj]
+
+            + (V31[fd_["yz3"]] * V42[fd_["zy1"]]
+            + V31[fd_["yz1"]] * V42[fd_["zy3"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zx3"], Rij, is, it, iu] += (
+            (V13[fd_["zx3"]] * V24[fd_["xz1"]]
+            + V13[fd_["zx1"]] * V24[fd_["xz3"]]) * Props[xi, xj]
+
+            + (V31[fd_["zx3"]] * V42[fd_["xz1"]]
+            + V31[fd_["zx1"]] * V42[fd_["xz3"]]) * Props[xj, xi]
+        )
+
+        X_sum[21 + fd_["zy3"], Rij, is, it, iu] += (
+            (V13[fd_["zy3"]] * V24[fd_["yz1"]]
+            + V13[fd_["zy1"]] * V24[fd_["yz3"]]) * Props[xi, xj]
+
+            + (V31[fd_["zy3"]] * V42[fd_["yz1"]]
+            + V31[fd_["zy1"]] * V42[fd_["yz3"]]) * Props[xj, xi]
+        )
+
+        X .+= X_sum
     end
 end
 
