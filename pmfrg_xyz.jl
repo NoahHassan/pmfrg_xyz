@@ -683,17 +683,32 @@ function getXBubble!(Workspace, Lam)
     (; T, N, lenIntw) = Par.NumericalParams
     (; NUnique) = Par.System
 	 
-	iG(x, nw) = iG_(Workspace.State.iSigma, x, Lam, nw, T)
-	iSKat(x,nw) = iSKat_(Workspace.State.iSigma, Workspace.Deriv.iSigma, x, Lam, nw, T)
+	iGx(x, nw) = iG_(Workspace.State.iSigma.x, x, Lam, nw, T)
+    iGy(x, nw) = iG_(Workspace.State.iSigma.y, x, Lam, nw, T)
+    iGz(x, nw) = iG_(Workspace.State.iSigma.z, x, Lam, nw, T)
+
+    ### Does flavor type commute with differentiation in 1 / (G^-1 + iSigma) ? Probably
+	iSKatx(x,nw) = iSKat_(Workspace.State.iSigma.x, Workspace.Deriv.iSigma.x, x, Lam, nw, T)
+	iSKaty(x,nw) = iSKat_(Workspace.State.iSigma.y, Workspace.Deriv.iSigma.y, x, Lam, nw, T)
+	iSKatz(x,nw) = iSKat_(Workspace.State.iSigma.z, Workspace.Deriv.iSigma.z, x, Lam, nw, T)
 
 	function getKataninProp!(BubbleProp,nw1,nw2)
 		for i in 1:Par.System.NUnique, j in 1:Par.System.NUnique
-			BubbleProp[i,j] = iSKat(i,nw1) * iG(j,nw2)* T
+			BubbleProp[i, j, x, x] = iSKatx(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, x, y] = iSKatx(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, x, z] = iSKatx(i, nw1) * iGz(j, nw2) * T
+			BubbleProp[i, j, y, x] = iSKaty(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, y, y] = iSKaty(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, y, z] = iSKaty(i, nw1) * iGz(j, nw2) * T
+			BubbleProp[i, j, z, x] = iSKatz(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, z, y] = iSKatz(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, z, z] = iSKatz(i, nw1) * iGz(j, nw2) * T
 		end
-		return SMatrix{NUnique,NUnique}(BubbleProp)
+		return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
 	end
+
 	for is in 1:N, it in 1:N
-        BubbleProp = zeros(NUnique,NUnique)
+        BubbleProp = zeros(NUnique,NUnique, 3, 3)
         ns = is - 1
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
@@ -703,60 +718,91 @@ function getXBubble!(Workspace, Lam)
                 if (ns+nt+nu)%2 == 0	# skip unphysical bosonic frequency combinations
                     continue
                 end
-                addXTilde!(Workspace,is,it,iu,nw,sprop) # add to XTilde-type bubble functions
-                if(!Par.Options.use_symmetry || nu<=nt)
-                    addX!(Workspace,is,it,iu,nw,sprop)# add to X-type bubble functions
-                end
+                addY!(Workspace, is, it, iu, nw, sprop) # add to XTilde-type bubble functions
+
+                ### If no u--t symmetry, then add all the bubbles
+                ### If use u--t symmetry, then only add for nu smaller then nt (all other obtained by symmetry)
+                # if(!Par.Options.use_symmetry || nu<=nt)
+                addX!(Workspace, is, it, iu, nw, sprop)
+                # end
             end
         end
 	end
 end
 
-function symmetrizeBubble!(X::BubbleType,Par)
+function symmetrizeBubble!(X::Array{T, 5},Par)
     N = Par.NumericalParams.N
     (;Npairs,OnsitePairs) = Par.System
     use_symmetry = Par.Options.use_symmetry
     # use the u <--> t symmetry
     if(use_symmetry)
-        for it in 1:N
-            for iu in it+1:N, is in 1:N, Rij in 1:Npairs
-                X.a[Rij,is,it,iu] = -X.a[Rij,is,iu,it]
-                X.b[Rij,is,it,iu] = -X.b[Rij,is,iu,it]
-                X.c[Rij,is,it,iu] = (
-                + X.a[Rij,is,it,iu]+
-                - X.b[Rij,is,it,iu]+
-                + X.c[Rij,is,iu,it])
-            end
-        end
+        # for it in 1:N
+        #     for iu in it+1:N, is in 1:N, Rij in 1:Npairs
+        #         X.a[Rij,is,it,iu] = -X.a[Rij,is,iu,it]
+        #         X.b[Rij,is,it,iu] = -X.b[Rij,is,iu,it]
+        #         X.c[Rij,is,it,iu] = (
+        #         + X.a[Rij,is,it,iu]+
+        #         - X.b[Rij,is,it,iu]+
+        #         + X.c[Rij,is,iu,it])
+        #     end
+        # end
     end
     #local definitions of X.Tilde vertices
     for iu in 1:N
 		for it in 1:N, is in 1:N, R in OnsitePairs
-			X.Ta[R,is,it,iu] = X.a[R,is,it,iu]
-			X.Tb[R,is,it,iu] = X.b[R,is,it,iu]
-			X.Tc[R,is,it,iu] = X.c[R,is,it,iu]
-			X.Td[R,is,it,iu] = -X.c[R,is,iu,it]
+            X[21 + 1, R, is, it, iu] = X[1, R, it, is, iu]  ###
+            X[21 + 2, R, is, it, iu] = X[2, R, it, is, iu]  ### Yaa = Xaa
+            X[21 + 3, R, is, it, iu] = X[3, R, it, is, iu]  ###
+            for n in 1:6
+                X[21 + 3 + n, R, is, it, iu] = X[9 + n, R, it, is, iu]      ### Yab1 = Xab2
+                X[21 + 9 + n, R, is, it, iu] = X[3 + n, R, it, is, iu]      ### Yab2 = Xab1
+                X[21 + 15 + n, R, is, it, iu] = X[15 + n, R, it, is, iu]    ### Yab3 = Xab3
+            end
+			# X.Ta[R,is,it,iu] = X.a[R,is,it,iu]
+			# X.Tb[R,is,it,iu] = X.b[R,is,it,iu]
+			# X.Tc[R,is,it,iu] = X.c[R,is,it,iu]
+			# X.Td[R,is,it,iu] = -X.c[R,is,iu,it]
 		end
     end
-    X.Td .= X.Ta .- X.Tb .- X.Tc
+    # X.Td .= X.Ta .- X.Tb .- X.Tc
 end
 
-function addToVertexFromBubble!(Gamma::VertexType,X::BubbleType)
-    for iu in axes(Gamma.a,4)
-        for it in axes(Gamma.a,3), is in axes(Gamma.a,2), Rij in axes(Gamma.a,1)
-            Gamma.a[Rij,is,it,iu] += X.a[Rij,is,it,iu] - X.Ta[Rij,it,is,iu] + X.Ta[Rij,iu,is,it]
-            Gamma.b[Rij,is,it,iu] += X.b[Rij,is,it,iu] - X.Tc[Rij,it,is,iu] + X.Tc[Rij,iu,is,it]
-            Gamma.c[Rij,is,it,iu] += X.c[Rij,is,it,iu] - X.Tb[Rij,it,is,iu] + X.Td[Rij,iu,is,it]
+### Gamma = Gamma[flavortype, Rij, is, it, iu]
+function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5})
+    for iu in axes(Gamma,5)
+        for it in axes(Gamma,4), is in axes(Gamma,3), Rij in axes(Gamma,2)
+            for n in 1:9 ### Zaa(s,t,u) = -Yaa(s,u,t) ; Zab1(s,t,u) = -Yab1(s,u,t)
+                Gamma[n, Rij, is, it, iu] += (
+                    X[n, Rij, is, it, iu] 
+                    + X[21 + n, Rij, is, it, iu] 
+                    - X[21 + n, is, iu, it]
+                )
+            end
+            for n in 1:6 ### Zab2(s,t,u) = -Yab3(s,u,t) ; Zab3(s,t,u) = -Yab2(s,u,t)
+                Gamma[9 + n, Rij, is, it, iu] += (
+                    X[9 + n, Rij, is, it, iu] 
+                    + X[21 + 9 + n, Rij, is, it, iu] 
+                    - X[21 + 15 + n, is, iu, it]
+                )
+                Gamma[15 + n, Rij, is, it, iu] += (
+                    X[15 + n, Rij, is, it, iu] 
+                    + X[21 + 15 + n, Rij, is, it, iu] 
+                    - X[21 + 9 + n, is, iu, it]
+                )
+            end
+            # Gamma.a[Rij,is,it,iu] += X.a[Rij,is,it,iu] - X.Ta[Rij,it,is,iu] + X.Ta[Rij,iu,is,it]
+            # Gamma.b[Rij,is,it,iu] += X.b[Rij,is,it,iu] - X.Tc[Rij,it,is,iu] + X.Tc[Rij,iu,is,it]
+            # Gamma.c[Rij,is,it,iu] += X.c[Rij,is,it,iu] - X.Tb[Rij,it,is,iu] + X.Td[Rij,iu,is,it]
         end
     end 
     return Gamma
 end
 
-function symmetrizeVertex!(Gamma::VertexType,Par)
+function symmetrizeVertex!(Gamma::Array{T, 5},Par)
 	N = Par.NumericalParams.N
 	for iu in 1:N
 		for it in 1:N, is in 1:N, R in Par.System.OnsitePairs
-			Gamma.c[R,is,it,iu] = -Gamma.b[R,it,is,iu]
+			Gamma[:, R, is, it, iu] .= -Gamma[:, R, it, is, iu]
 		end
 	end
 end
@@ -770,9 +816,17 @@ function getDFint!(Workspace, Lam::Real)
     (; T, lenIntw_acc) = Par.NumericalParams
     NUnique = Par.System.NUnique
 	
-	iSigma(x, nw) = iSigma_(State.iSigma, x, nw)
-	iG(x, nw) = iG_(State.iSigma, x, Lam, nw, T)
-	iS(x, nw) = iS_(State.iSigma, x, Lam, nw, T)
+	iSigmax(x, nw) = iSigma_(State.iSigma.x, x, nw)
+	iSigmay(x, nw) = iSigma_(State.iSigma.y, x, nw)
+	iSigmaz(x, nw) = iSigma_(State.iSigma.z, x, nw)
+
+	iGx(x, nw) = iG_(State.iSigma.x, x, Lam, nw, T)
+	iGy(x, nw) = iG_(State.iSigma.y, x, Lam, nw, T)
+	iGz(x, nw) = iG_(State.iSigma.z, x, Lam, nw, T)
+
+	iSx(x, nw) = iS_(State.iSigma.x, x, Lam, nw, T)
+	iSy(x, nw) = iS_(State.iSigma.y, x, Lam, nw, T)
+	iSz(x, nw) = iS_(State.iSigma.z, x, Lam, nw, T)
 
 	Theta(Lam, w) = w^2 / (w^2 + Lam^2)
 	
@@ -780,31 +834,36 @@ function getDFint!(Workspace, Lam::Real)
 		sumres = 0.
 		for nw in -lenIntw_acc:lenIntw_acc-1
 			w = get_w(nw,T) ### is computed in iS, iG and iSigma too.
-			sumres += iS(x, nw) / iG(x, nw) * Theta(Lam, w) * iSigma(x, nw) / w # 1 / w is simply G_0 without Lambda (right?)
-		end
-		Deriv.f_int[x] = -1.5 * T * sumres
+			sumres += iSx(x, nw) / iGy(x, nw) * Theta(Lam, w) * iSigmax(x, nw) / w # 1 / w is simply G_0 without Lambda (right?)
+            sumres += iSy(x, nw) / iGy(x, nw) * Theta(Lam, w) * iSigmay(x, nw) / w
+            sumres += iSz(x, nw) / iGz(x, nw) * Theta(Lam, w) * iSigmaz(x, nw) / w
+        end
+		Deriv.f_int[x] = -0.5 * T * sumres ### I divided the original by 3, because 3 flavors
 	end
 end
 
 function get_Self_Energy!(Workspace, Lam)
 	Par = Workspace.Par
-	@inline iS(x, nw) = iS_(Workspace.State.iSigma, x, Lam, nw, Par.NumericalParams.T) / 2
-	compute1PartBubble!(Workspace.Deriv.iSigma, Workspace.State.Gamma, iS, Par)
+	@inline iSx(x, nw) = iS_(Workspace.State.iSigma.x, x, Lam, nw, Par.NumericalParams.T) / 2
+	@inline iSy(x, nw) = iS_(Workspace.State.iSigma.y, x, Lam, nw, Par.NumericalParams.T) / 2
+	@inline iSz(x, nw) = iS_(Workspace.State.iSigma.z, x, Lam, nw, Par.NumericalParams.T) / 2
+	compute1PartBubble!(Workspace.Deriv.iSigma, Workspace.State.Gamma, [iSx, iSy, iSz], Par)
 end
 
-function compute1PartBubble!(Dgamma::AbstractArray, Gamma::VertexType, Prop, Par)
+function compute1PartBubble!(Dgamma::AbstractArray, Gamma::Array{T, 5}, Props, Par)
     invpairs = Par.System.invpairs
 
 	setZero!(Dgamma)
 
     #### WARUM HIER T, U, S ???????
-	@inline Gamma_a(Rij,s,t,u) = V_(Gamma.a, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # Tilde-type can be obtained by permutation of vertices
-	@inline Gamma_b(Rij,s,t,u) = V_(Gamma.b, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # cTilde corresponds to b type vertex!
+	# @inline Gamma_a(Rij,s,t,u) = V_(Gamma.a, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # Tilde-type can be obtained by permutation of vertices
+	# @inline Gamma_b(Rij,s,t,u) = V_(Gamma.b, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # cTilde corresponds to b type vertex!
+    @inline Gamma_(Rij, s, t, u) = V_(Gamma, s, t, u, Rij, invpairs[Rij], Par.NumericalParams.N)
 
-    addTo1PartBubble!(Dgamma, Gamma_a, Gamma_b, Prop, Par)
+    addTo1PartBubble!(Dgamma, Gamma_, Props, Par)
 end
 
-function addTo1PartBubble!(Dgamma::AbstractArray, Gamma_a::Function, Gamma_b::Function, Prop, Par)
+function addTo1PartBubble!(Dgamma::AbstractArray, Gamma_::Function, Props, Par)
 
     (; T, N, lenIntw_acc) = Par.NumericalParams
     (; siteSum, Nsum, OnsitePairs) = Par.System
@@ -813,14 +872,29 @@ function addTo1PartBubble!(Dgamma::AbstractArray, Gamma_a::Function, Gamma_b::Fu
 		nw1 = iw1 - 1
     	for (x, Rx) in enumerate(OnsitePairs)
 			for nw in -lenIntw_acc:lenIntw_acc-1
-				jsum = 0.
+				jsum = zeros(3).
 				wpw1 = nw1 + nw + 1 #w + w1: Adding two fermionic Matsubara frequencies gives a +1 for the bosonic index
 				wmw1 = nw - nw1
 				for k_spl in 1:Nsum[Rx]
 					(; m, ki, xk) = siteSum[k_spl, Rx]
-					jsum += (Gamma_a(ki, wpw1, 0, wmw1) + 2 * Gamma_b(ki, wpw1, 0, wmw1)) * Prop(xk, nw) * m
+                    gam = Gamma_(ki, 0, -wmw1, -wpw1)
+                    jsum[fd_["xx"]] += (
+                        gam["xx"] * Props[0](xk, nw)
+                        + gam["yx1"] * Props[1](xk, nw)
+                        + gam["zx1"] * Props[2](xk, nw)
+                    ) * m ### different m for all flavors? Probably not
+                    jsum[fd_["yy"]] += (
+                        gam["xy1"] * Props[0](xk, nw)
+                        + gam["yy"] * Props[1](xk, nw)
+                        + gam["zy1"] * Props[2](xk, nw)
+                    ) * m
+                    jsum[fd_["zz"]] += (
+                        gam["xz1"] * Props[0](xk, nw)
+                        + gam["yz1"] * Props[1](xk, nw)
+                        + gam["zz"] * Props[2](xk, nw)
+                    ) * m
 				end
-				Dgamma[x,iw1] += -T * jsum #For the self-energy derivative, the factor of 1/2 must be in the propagator
+				Dgamma[:, x, iw1] .+= -T * jsum #For the self-energy derivative, the factor of 1/2 must be in the propagator
 			end
 		end
 	end
@@ -829,7 +903,7 @@ end
 
 function getDeriv!(Deriv, State, setup, Lam)
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
-    Workspace = OneLoopWorkspace(Deriv, State, X, Par)
+    Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
     getDFint!(Workspace, Lam)
 
