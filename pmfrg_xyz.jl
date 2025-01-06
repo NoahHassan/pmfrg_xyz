@@ -914,22 +914,22 @@ function getDeriv!(Deriv, State, setup, Lam)
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
-    println("\n=====getDFint=====\n")
+    println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
 
-    println("=====get_Self_Energy=====\n")
+    println("======== get_Self_Energy =========")
     get_Self_Energy!(Workspace, Lam)
 
-    println("=====getXBubble=====\n")
+    println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
 
-    println("=====symmetrizeBubble=====\n")
+    println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
 
-    println("=====addToVertexFromBubble=====\n")
+    println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
 
-    println("=====symmetrizeVertex=====\n")
+    println("======== symmetrizeVertex ========")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
     return
 end
@@ -1037,14 +1037,16 @@ struct Observables
     gamma
 end
 
-getChi(State::ArrayPartition, Lam::Real, Par) = getChi(State.x[2], State.x[5], Lam, Par)
+getChi(State::ArrayPartition, Lam::Real, Par) = getChi(State.x[2], State.x[3], State.x[5], Lam, Par)
 
-function getChi(iSigma::AbstractArray, Gamma_c::AbstractArray, Lam::Real, Par)
+### highly unlikely to be correct. Need to check again
+function getChi(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
 	(;T,N,lenIntw_acc) = Par.NumericalParams
 	(;Npairs,invpairs,PairTypes,OnsitePairs) = Par.System
 
-	iG(x,w) = iG_(iSigma, x, Lam, w, T)
-	Vc_(Rij,s,t,u) = V_(Gamma_c,s,t,u,Rij,invpairs[Rij],N)
+	iGx(x,w) = iG_(iSigmaX, x, Lam, w, T)
+    iGy(x,w) = iG_(iSigmaY, x, Lam, w, T)
+	Vxy2(Rij,s,t,u) = V_(Gamma,s,t,u,Rij,invpairs[Rij],N)[fd_["xy2"]]
 
 	Chi = zeros(_getFloatType(Par),Npairs)
 
@@ -1052,14 +1054,14 @@ function getChi(iSigma::AbstractArray, Gamma_c::AbstractArray, Lam::Real, Par)
 		(;xi,xj) = PairTypes[Rij]
 		for nK in -lenIntw_acc:lenIntw_acc-1
 			if Rij in OnsitePairs
-				Chi[Rij,1] += T * iG(xi,nK) ^2
+				Chi[Rij,1] += T * iGx(xi,nK) * iGy(xi, nK)
 			end
 			for nK2 in -lenIntw_acc:lenIntw_acc-1
 				npwpw2 = nK+nK2+1
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
-				GGGG = iG(xi,nK)^2 * iG(xj,nK2)^2
-				Chi[Rij] += T^2 * GGGG *Vc_(Rij,0,npwpw2,w2mw)
+				GGGG = iGx(xi,nK)^2 * iGy(xj,nK2)^2
+				Chi[Rij] += T^2 * GGGG * Vxy2(Rij,0,npwpw2,w2mw)
 			end
         end
     end
@@ -1068,6 +1070,9 @@ end
 
 
 Pkg.add("StructArrays")
+Pkg.add("JLD2")
+
+using JLD2
 
 ##########################################################
 ######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
@@ -1094,13 +1099,15 @@ Par = Params( #create a group of all parameters to pass them to the FRG Solver
 ## Evaluation Dimer Susc
 
 tr = LinRange(3,-2,20)
+save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
+
 chiR = [getChi(sol(t),exp(t),Par) for t in tr] # getting susceptibility
 fig = Figure()
 ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
 
 scatterlines!(ax,exp.(tr),getindex.(chiR,1))
-scatterlines!(ax,exp.(tr),getindex.(chiR,2))
-fig
+# scatterlines!(ax,exp.(tr),getindex.(chiR,2))
+display("image/png", fig)
 
 ######################################################################
 ######### SQUARE LATTICE ## SQUARE LATTICE ## SQUARE LATTICE #########
