@@ -96,6 +96,7 @@ struct OneLoopWorkspace{T}
 end
 
 getVDims(Par) = (21, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
+getBubbleVDims(Par) = (42, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 _getFloatType(Par) = typeof(Par.NumericalParams.T)
 
 # function VertexType(VDims::Tuple)
@@ -138,8 +139,8 @@ function StateType(NUnique::Int, N::Int, VDims::Tuple, type=Float64)
     )
 end
 StateType(Par) = StateType(Par.System.NUnique, Par.NumericalParams.N, getVDims(Par), _getFloatType(Par))
-# StateType(f_int, iSigma, Gamma_a, Gamma_b, Gamma_c) = StateType(f_int, iSigma, VertexType(Gamma_a, Gamma_b, Gamma_c))
-RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma, x.Gamma)
+StateType(f_int, iSigma_x, iSigma_y, iSigma_z, Gamma) = StateType(f_int, SigmaType(iSigma_x, iSigma_y, iSigma_z), Gamma)
+RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma.x, x.iSigma.y, x.iSigma.z, x.Gamma)
 StateType(Arr::ArrayPartition) = StateType(Arr.x...)
 
 function NumericalParams(;
@@ -324,16 +325,16 @@ function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji:
         0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### zy3
     ]
 
-    FlavorTransform = Diagonal(ones(21))
+    FlavorTransform = Matrix{Float64}(I, 21, 21)
 
     if ns < 0
-        FlavorTransform .= MS_ * FlavorTransform
+        FlavorTransform = MS_ * FlavorTransform
     end
     if nt < 0
-        FlavorTransform .= MT_ * FlavorTransform
+        FlavorTransform = MT_ * FlavorTransform
     end
     if nu < 0
-        FlavorTransform .= MU_ * FlavorTransform
+        FlavorTransform = MU_ * FlavorTransform
     end
 
     ns, nt, nu, swapsites = ConvertFreqArgs(ns, nt, nu, N)
@@ -409,8 +410,8 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 			ki,kj,m,xk = S_ki[k_spl,Rij],S_kj[k_spl,Rij],S_m[k_spl,Rij],S_xk[k_spl,Rij]
 			Ptm = Props[xk,xk,:,:]*m ### Props now contains two flavor indices
 
-            V12 = Vert(ki, s, wpw1, -wpw2)
-            V34 = Vert(kj, s, -wmw3, -wmw4)
+            V12 = Vert(ki, ns, wpw1, -wpw2)
+            V34 = Vert(kj, ns, -wmw3, -wmw4)
 
             X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["xy1"]] * V34[fd_["yx1"]] * Ptm[2, 2] - V12[fd_["xz1"]] * V34[fd_["zx1"]] * Ptm[3, 3]
             X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["yz1"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["yx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
@@ -481,7 +482,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         V31 = Vert(Rij, wmw3, nt, -wmw1)
         V42 = Vert(Rij, -wpw4, -nt, wpw2)
 
-        X_sum = zeros(42)
+        X_sum = zeros(42, Npairs, N, N, N)
 
         ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t) 
 
@@ -697,21 +698,24 @@ function getXBubble!(Workspace, Lam)
 
 	function getKataninProp!(BubbleProp,nw1,nw2)
 		for i in 1:Par.System.NUnique, j in 1:Par.System.NUnique
-			BubbleProp[i, j, x, x] = iSKatx(i, nw1) * iGx(j, nw2) * T
-			BubbleProp[i, j, x, y] = iSKatx(i, nw1) * iGy(j, nw2) * T
-			BubbleProp[i, j, x, z] = iSKatx(i, nw1) * iGz(j, nw2) * T
-			BubbleProp[i, j, y, x] = iSKaty(i, nw1) * iGx(j, nw2) * T
-			BubbleProp[i, j, y, y] = iSKaty(i, nw1) * iGy(j, nw2) * T
-			BubbleProp[i, j, y, z] = iSKaty(i, nw1) * iGz(j, nw2) * T
-			BubbleProp[i, j, z, x] = iSKatz(i, nw1) * iGx(j, nw2) * T
-			BubbleProp[i, j, z, y] = iSKatz(i, nw1) * iGy(j, nw2) * T
-			BubbleProp[i, j, z, z] = iSKatz(i, nw1) * iGz(j, nw2) * T
+			BubbleProp[i, j, 1, 1] = iSKatx(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, 1, 2] = iSKatx(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, 1, 3] = iSKatx(i, nw1) * iGz(j, nw2) * T
+			BubbleProp[i, j, 2, 1] = iSKaty(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, 2, 2] = iSKaty(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, 2, 3] = iSKaty(i, nw1) * iGz(j, nw2) * T
+			BubbleProp[i, j, 3, 1] = iSKatz(i, nw1) * iGx(j, nw2) * T
+			BubbleProp[i, j, 3, 2] = iSKatz(i, nw1) * iGy(j, nw2) * T
+			BubbleProp[i, j, 3, 3] = iSKatz(i, nw1) * iGz(j, nw2) * T
 		end
-		return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
+
+        return BubbleProp
+		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
+        ### SMatrix can only create 2d array (according to ChatGPT). Use SArray instead
 	end
 
 	for is in 1:N, it in 1:N
-        BubbleProp = zeros(NUnique,NUnique, 3, 3)
+        BubbleProp = zeros(NUnique, NUnique, 3, 3)
         ns = is - 1
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
@@ -778,19 +782,19 @@ function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5}) where {T}
                 Gamma[n, Rij, is, it, iu] += (
                     X[n, Rij, is, it, iu] 
                     + X[21 + n, Rij, is, it, iu] 
-                    - X[21 + n, is, iu, it]
+                    - X[21 + n, Rij, is, iu, it]
                 )
             end
             for n in 1:6 ### Zab2(s,t,u) = -Yab3(s,u,t) ; Zab3(s,t,u) = -Yab2(s,u,t)
                 Gamma[9 + n, Rij, is, it, iu] += (
                     X[9 + n, Rij, is, it, iu] 
                     + X[21 + 9 + n, Rij, is, it, iu] 
-                    - X[21 + 15 + n, is, iu, it]
+                    - X[21 + 15 + n, Rij, is, iu, it]
                 )
                 Gamma[15 + n, Rij, is, it, iu] += (
                     X[15 + n, Rij, is, it, iu] 
                     + X[21 + 15 + n, Rij, is, it, iu] 
-                    - X[21 + 9 + n, is, iu, it]
+                    - X[21 + 9 + n, Rij, is, iu, it]
                 )
             end
             # Gamma.a[Rij,is,it,iu] += X.a[Rij,is,it,iu] - X.Ta[Rij,it,is,iu] + X.Ta[Rij,iu,is,it]
@@ -853,7 +857,7 @@ function get_Self_Energy!(Workspace, Lam)
 	compute1PartBubble!(Workspace.Deriv.iSigma, Workspace.State.Gamma, [iSx, iSy, iSz], Par)
 end
 
-function compute1PartBubble!(Dgamma::AbstractArray, Gamma::Array{T, 5}, Props, Par) where {T}
+function compute1PartBubble!(Dgamma::SigmaType, Gamma::Array{T, 5}, Props, Par) where {T}
     invpairs = Par.System.invpairs
 
 	setZero!(Dgamma)
@@ -866,7 +870,7 @@ function compute1PartBubble!(Dgamma::AbstractArray, Gamma::Array{T, 5}, Props, P
     addTo1PartBubble!(Dgamma, Gamma_, Props, Par)
 end
 
-function addTo1PartBubble!(Dgamma::AbstractArray, Gamma_::Function, Props, Par)
+function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
 
     (; T, N, lenIntw_acc) = Par.NumericalParams
     (; siteSum, Nsum, OnsitePairs) = Par.System
@@ -875,30 +879,32 @@ function addTo1PartBubble!(Dgamma::AbstractArray, Gamma_::Function, Props, Par)
 		nw1 = iw1 - 1
     	for (x, Rx) in enumerate(OnsitePairs)
 			for nw in -lenIntw_acc:lenIntw_acc-1
-				jsum = zeros(3).
+				jsum = zeros(3)
 				wpw1 = nw1 + nw + 1 #w + w1: Adding two fermionic Matsubara frequencies gives a +1 for the bosonic index
 				wmw1 = nw - nw1
 				for k_spl in 1:Nsum[Rx]
 					(; m, ki, xk) = siteSum[k_spl, Rx]
                     gam = Gamma_(ki, 0, -wmw1, -wpw1)
                     jsum[fd_["xx"]] += (
-                        gam["xx"] * Props[0](xk, nw)
-                        + gam["yx1"] * Props[1](xk, nw)
-                        + gam["zx1"] * Props[2](xk, nw)
+                        gam[fd_["xx"]] * Props[1](xk, nw)
+                        + gam[fd_["yx1"]] * Props[2](xk, nw)
+                        + gam[fd_["zx1"]] * Props[3](xk, nw)
                     ) * m ### different m for all flavors? Probably not
                     jsum[fd_["yy"]] += (
-                        gam["xy1"] * Props[0](xk, nw)
-                        + gam["yy"] * Props[1](xk, nw)
-                        + gam["zy1"] * Props[2](xk, nw)
+                        gam[fd_["xy1"]] * Props[1](xk, nw)
+                        + gam[fd_["yy"]] * Props[2](xk, nw)
+                        + gam[fd_["zy1"]] * Props[3](xk, nw)
                     ) * m
                     jsum[fd_["zz"]] += (
-                        gam["xz1"] * Props[0](xk, nw)
-                        + gam["yz1"] * Props[1](xk, nw)
-                        + gam["zz"] * Props[2](xk, nw)
+                        gam[fd_["xz1"]] * Props[1](xk, nw)
+                        + gam[fd_["yz1"]] * Props[2](xk, nw)
+                        + gam[fd_["zz"]] * Props[3](xk, nw)
                     ) * m
 				end
-				Dgamma[:, x, iw1] .+= -T * jsum #For the self-energy derivative, the factor of 1/2 must be in the propagator
-			end
+				Dgamma.x[x, iw1] += -T * jsum[1] #For the self-energy derivative, the factor of 1/2 must be in the propagator
+                Dgamma.y[x, iw1] += -T * jsum[2]
+                Dgamma.z[x, iw1] += -T * jsum[3]
+            end
 		end
 	end
     # return Dgamma
@@ -908,15 +914,22 @@ function getDeriv!(Deriv, State, setup, Lam)
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
+    println("\n=====getDFint=====\n")
     getDFint!(Workspace, Lam)
 
+    println("=====get_Self_Energy=====\n")
     get_Self_Energy!(Workspace, Lam)
 
+    println("=====getXBubble=====\n")
     getXBubble!(Workspace, Lam)
 
+    println("=====symmetrizeBubble=====\n")
     symmetrizeBubble!(Workspace.X, Par)
 
+    println("=====addToVertexFromBubble=====\n")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
+
+    println("=====symmetrizeVertex=====\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
     return
 end
@@ -932,11 +945,11 @@ function AllocateSetup(Par::OneLoopParams)
     println("One Loop: T= ",Par.NumericalParams.T)
     ## Allocate Memory:
     floattype = _getFloatType(Par)
-    X = zeros(floattype, getVDims(Par))
+    X = zeros(floattype, getBubbleVDims(Par))
     return (X,Par)
 end
 
-function InitializeState(Par)
+function InitializeState(Par, multiCouplings)
 
     N = Par.NumericalParams.N;
     ( ; couplings, NUnique) = Par.System;
@@ -953,7 +966,7 @@ function InitializeState(Par)
     );
 
     Gamma = State.x[5]
-    setToBareVertex!(Gamma, couplings)      ### sets initial conditions to couplings
+    setToBareVertex!(Gamma, multiCouplings)      ### sets initial conditions to couplings
     return State
 
 end
@@ -978,7 +991,7 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     return sol
 end
 
-SolveFRG(Par;kwargs...) = launchPMFRG!(InitializeState(Par),AllocateSetup(Par),getDeriv!; kwargs...)
+SolveFRG(Par, couplings; kwargs...) = launchPMFRG!(InitializeState(Par, couplings),AllocateSetup(Par),getDeriv!; kwargs...)
 
 function get_t_min(Lam)
     Lam < exp(-30) && @warn "lambda_min too small! Set to exp(-30) instead."
@@ -998,19 +1011,19 @@ end
 
 function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector) where T
     for Rj in axes(Gamma,2)
-        Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[1, Rj]
-        Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[1, Rj]
-        Gamma[fd_["zx2"], Rj, :, :, :] .= -couplings[2, Rj]
-        Gamma[fd_["xz2"], Rj, :, :, :] .= -couplings[2, Rj]
-        Gamma[fd_["xy2"], Rj, :, :, :] .= -couplings[3, Rj]
-        Gamma[fd_["yx2"], Rj, :, :, :] .= -couplings[3, Rj]
+        Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[Rj][1]
+        Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[Rj][1]
+        Gamma[fd_["zx2"], Rj, :, :, :] .= -couplings[Rj][2]
+        Gamma[fd_["xz2"], Rj, :, :, :] .= -couplings[Rj][2]
+        Gamma[fd_["xy2"], Rj, :, :, :] .= -couplings[Rj][3]
+        Gamma[fd_["yx2"], Rj, :, :, :] .= -couplings[Rj][3]
 
-        Gamma[fd_["yz3"], Rj, :, :, :] .= couplings[1, Rj]
-        Gamma[fd_["zy3"], Rj, :, :, :] .= couplings[1, Rj]
-        Gamma[fd_["zx3"], Rj, :, :, :] .= couplings[2, Rj]
-        Gamma[fd_["xz3"], Rj, :, :, :] .= couplings[2, Rj]
-        Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[3, Rj]
-        Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[3, Rj]
+        Gamma[fd_["yz3"], Rj, :, :, :] .= couplings[Rj][1]
+        Gamma[fd_["zy3"], Rj, :, :, :] .= couplings[Rj][1]
+        Gamma[fd_["zx3"], Rj, :, :, :] .= couplings[Rj][2]
+        Gamma[fd_["xz3"], Rj, :, :, :] .= couplings[Rj][2]
+        Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[Rj][3]
+        Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[Rj][3]
     end
     return Gamma
 end
@@ -1064,7 +1077,8 @@ using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructA
 using SpinFRGLattices.StaticArrays
 using CairoMakie
 
-System = getPolymer(2) # create a structure that contains all information about the geometry of the problem. 
+System = getPolymer(2) # create a structure that contains all information about the geometry of the problem.
+couplings = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
 
 Par = Params( #create a group of all parameters to pass them to the FRG Solver
     System, # geometry, this is always required
@@ -1075,8 +1089,7 @@ Par = Params( #create a group of all parameters to pass them to the FRG Solver
     lambda_min = .01
 )
 
-@time sol = SolveFRG(Par,method = DP5());
-
+@time sol = SolveFRG(Par, couplings, method = DP5());
 
 ## Evaluation Dimer Susc
 
