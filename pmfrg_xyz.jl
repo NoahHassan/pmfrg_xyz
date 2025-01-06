@@ -121,7 +121,7 @@ _getFloatType(Par) = typeof(Par.NumericalParams.T)
 # end
 # BubbleType(Par) = BubbleType(getVDims(Par))
 
-function SigmaType(type=Float64, NUnique::Int, N::Int)
+function SigmaType(NUnique::Int, N::Int, type=Float64)
     return SigmaType(
         zeros(type, NUnique, N),
         zeros(type, NUnique, N),
@@ -328,10 +328,13 @@ function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji:
 
     if ns < 0
         FlavorTransform .= MS_ * FlavorTransform
+    end
     if nt < 0
         FlavorTransform .= MT_ * FlavorTransform
+    end
     if nu < 0
         FlavorTransform .= MU_ * FlavorTransform
+    end
 
     ns, nt, nu, swapsites = ConvertFreqArgs(ns, nt, nu, N)
     Rij = ifelse(swapsites, Rji, Rij)
@@ -730,7 +733,7 @@ function getXBubble!(Workspace, Lam)
 	end
 end
 
-function symmetrizeBubble!(X::Array{T, 5},Par)
+function symmetrizeBubble!(X::Array{T, 5}, Par) where {T}
     N = Par.NumericalParams.N
     (;Npairs,OnsitePairs) = Par.System
     use_symmetry = Par.Options.use_symmetry
@@ -768,7 +771,7 @@ function symmetrizeBubble!(X::Array{T, 5},Par)
 end
 
 ### Gamma = Gamma[flavortype, Rij, is, it, iu]
-function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5})
+function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5}) where {T}
     for iu in axes(Gamma,5)
         for it in axes(Gamma,4), is in axes(Gamma,3), Rij in axes(Gamma,2)
             for n in 1:9 ### Zaa(s,t,u) = -Yaa(s,u,t) ; Zab1(s,t,u) = -Yab1(s,u,t)
@@ -798,7 +801,7 @@ function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5})
     return Gamma
 end
 
-function symmetrizeVertex!(Gamma::Array{T, 5},Par)
+function symmetrizeVertex!(Gamma::Array{T, 5},Par) where {T}
 	N = Par.NumericalParams.N
 	for iu in 1:N
 		for it in 1:N, is in 1:N, R in Par.System.OnsitePairs
@@ -850,7 +853,7 @@ function get_Self_Energy!(Workspace, Lam)
 	compute1PartBubble!(Workspace.Deriv.iSigma, Workspace.State.Gamma, [iSx, iSy, iSz], Par)
 end
 
-function compute1PartBubble!(Dgamma::AbstractArray, Gamma::Array{T, 5}, Props, Par)
+function compute1PartBubble!(Dgamma::AbstractArray, Gamma::Array{T, 5}, Props, Par) where {T}
     invpairs = Par.System.invpairs
 
 	setZero!(Dgamma)
@@ -928,7 +931,8 @@ Lam_to_t(t) = log(t)
 function AllocateSetup(Par::OneLoopParams)
     println("One Loop: T= ",Par.NumericalParams.T)
     ## Allocate Memory:
-    X = BubbleType(Par)
+    floattype = _getFloatType(Par)
+    X = zeros(floattype, getVDims(Par))
     return (X,Par)
 end
 
@@ -942,14 +946,14 @@ function InitializeState(Par)
 
     State = ArrayPartition(
         zeros(floattype, NUnique),          ### f_int
-        zeros(floattype, NUnique, N),       ### iSigma (self energy)
-        zeros(floattype, VDims),            ### Va                  This has dimensions (NPairs, n_matsubara, ...),
-        zeros(floattype, VDims),            ### Vb                  because V = V(s,t,u) (hence 3 matsubara indices)
-        zeros(floattype, VDims)             ### Vc
+        zeros(floattype, NUnique, N),       ### iSigma_x
+        zeros(floattype, NUnique, N),       ### iSigma_y
+        zeros(floattype, NUnique, N),       ### iSigma_z
+        zeros(floattype, VDims),            ### Gamma
     );
 
-    Gamma_c = State.x[5]
-    setToBareVertex!(Gamma_c, couplings)         ### sets initial conditions to -couplings (see eq. 57)
+    Gamma = State.x[5]
+    setToBareVertex!(Gamma, couplings)      ### sets initial conditions to couplings
     return State
 
 end
@@ -992,11 +996,23 @@ function generateSubstituteDeriv(getDeriv!::Function)
     
 end
 
-function setToBareVertex!(Gamma_c::AbstractArray{T,4}, couplings::AbstractVector) where T
-    for Rj in axes(Gamma_c,1)
-        Gamma_c[Rj,:,:,:] .= -couplings[Rj]
+function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector) where T
+    for Rj in axes(Gamma,2)
+        Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[1, Rj]
+        Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[1, Rj]
+        Gamma[fd_["zx2"], Rj, :, :, :] .= -couplings[2, Rj]
+        Gamma[fd_["xz2"], Rj, :, :, :] .= -couplings[2, Rj]
+        Gamma[fd_["xy2"], Rj, :, :, :] .= -couplings[3, Rj]
+        Gamma[fd_["yx2"], Rj, :, :, :] .= -couplings[3, Rj]
+
+        Gamma[fd_["yz3"], Rj, :, :, :] .= couplings[1, Rj]
+        Gamma[fd_["zy3"], Rj, :, :, :] .= couplings[1, Rj]
+        Gamma[fd_["zx3"], Rj, :, :, :] .= couplings[2, Rj]
+        Gamma[fd_["xz3"], Rj, :, :, :] .= couplings[2, Rj]
+        Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[3, Rj]
+        Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[3, Rj]
     end
-    return Gamma_c
+    return Gamma
 end
 
 #############################################################
@@ -1100,26 +1116,26 @@ Par = Params( #create a group of all parameters to pass them to the FRG Solver
 
 @time sol = SolveFRG(Par,method = DP5());
 
-## Evaluation Square lattice
-@time begin
+# ## Evaluation Square lattice
+# @time begin
     
-    using PMFRGEvaluation
-    using CairoMakie #for plotting. You can use whatever plotting package you like of course
+#     using PMFRGEvaluation
+#     using CairoMakie #for plotting. You can use whatever plotting package you like of course
 
-    System = SquareLattice.getSquareLattice(NLen)
-    Lattice = LatticeInfo(System,SquareLattice)
-    let 
-        chi_R = getChi(sol[end],Par.NumericalParams.lambda_min,Par)
+#     System = SquareLattice.getSquareLattice(NLen)
+#     Lattice = LatticeInfo(System,SquareLattice)
+#     let 
+#         chi_R = getChi(sol[end],Par.NumericalParams.lambda_min,Par)
         
-        chi = getFourier(chi_R,Lattice)
+#         chi = getFourier(chi_R,Lattice)
         
-        k = LinRange(-2pi,2pi,300)
+#         k = LinRange(-2pi,2pi,300)
         
-        chik = [chi(x,y) for x in k, y in k]
+#         chik = [chi(x,y) for x in k, y in k]
         
-        fig, ax, hm = heatmap(k,k,chik,axis = (;aspect = 1))
-        Colorbar(fig[1,2],hm)
-        fig
-    end
+#         fig, ax, hm = heatmap(k,k,chik,axis = (;aspect = 1))
+#         Colorbar(fig[1,2],hm)
+#         fig
+#     end
 
-end
+# end
