@@ -88,13 +88,6 @@ struct OneLoopParams
     Options::OptionParams
 end
 
-struct OneLoopWorkspace{T}
-    State::StateType{T} ### Stores the current state
-    Deriv::StateType{T} ### Stores the derivative
-    X::Array{T, 5}      ### Stores the bubble function X and XTilde
-    Par                 ### Params
-end
-
 getVDims(Par) = (21, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 getBubbleVDims(Par) = (42, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 _getFloatType(Par) = typeof(Par.NumericalParams.T)
@@ -170,17 +163,6 @@ end
 
 OptionParams(;use_symmetry::Bool = true,MinimalOutput::Bool = false,kwargs...) = OptionParams(use_symmetry,MinimalOutput)
 Params(System;kwargs...) = OneLoopParams(System,NumericalParams(;kwargs...),OptionParams(;kwargs...))
-
-function OneLoopWorkspace(Deriv,State,X,Par)
-    setZero!(Deriv)
-    setZero!(X)
-    return OneLoopWorkspace(
-        StateType(State.x...),
-        StateType(Deriv.x...),
-        X,
-        Par
-    )
-end
 
 #############################################################
 ######### PROPAGATORS ## PROPAGATORS ## PROPAGATORS #########
@@ -568,10 +550,22 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 
         ### Yab2 = Vaa Vba2 + Vab2 Vbb + Vac2 Vbc2 + (w -- -w + t)
 
+        # V24p = Vert(Rij, wpw2, nt, wpw4)
+        # V42p = Vert(Rij, -wpw4, nt, -wpw2)
+        # X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
+        #     (V13[fd_["xx"]] * V24p[fd_["xy2"]] * P_(1, 1)
+        #     + V13[fd_["xy2"]] * V24p[fd_["yy"]] * P_(2, 2)
+        #     + V13[fd_["xz2"]] * V24p[fd_["zy2"]] + P_(3, 3))
+
+        #     + (V31[fd_["xx"]] * V42p[fd_["xy2"]] * PT_(1, 1)
+        #     + V31[fd_["xy2"]] * V42p[fd_["yy"]] * PT_(2, 2)
+        #     + V31[fd_["xz2"]] * V42p[fd_["zy2"]] * PT_(3, 3))
+        # )
+
         X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
             (V13[fd_["xx"]] * V24[fd_["yx2"]] * P_(1, 1)
             + V13[fd_["xy2"]] * V24[fd_["yy"]] * P_(2, 2)
-            + V13[fd_["xz2"]] * V24[fd_["yz2"]] + P_(3, 3))
+            + V13[fd_["xz2"]] * V24[fd_["yz2"]] * P_(3, 3))
 
             + (V31[fd_["xx"]] * V42[fd_["yx2"]] * PT_(1, 1)
             + V31[fd_["xy2"]] * V42[fd_["yy"]] * PT_(2, 2)
@@ -910,9 +904,60 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
     # return Dgamma
 end
 
+# struct OneLoopWorkspace{T}
+#     State::StateType    ### Stores the current state
+#     Deriv::StateType    ### Stores the derivative
+#     X::Array{T, 5}      ### Stores the bubble function X and XTilde
+#     Par                 ### Params
+# end
+
+# function OneLoopWorkspace(Deriv,State,X,Par)
+#     setZero!(Deriv)
+#     setZero!(X)
+
+#     return OneLoopWorkspace(
+#         StateType(State.x...),
+#         StateType(Deriv.x...),
+#         X,
+#         Par
+#     )
+# end
+
+struct OneWoopLorkspace{T}
+    State::StateType    ### Stores the current state
+    Deriv::StateType    ### Stores the derivative
+    X::Array{T, 5}      ### Stores the bubble function X and XTilde
+    Par                 ### Params
+end
+
+function OneWoopLorkspace(State, Deriv, X, Par)
+    setZero!(Deriv)
+    setZero!(X)
+
+    return OneWoopLorkspace(
+        StateType(State.x...),
+        StateType(Deriv.x...),
+        X,
+        Par
+    )
+end
+
+using JLD2
 function getDeriv!(Deriv, State, setup, Lam)
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
-    Workspace = OneLoopWorkspace(State, Deriv, X, Par)
+
+    print("Sigma: ")
+    println(State.x[2][:, 4])
+    print("D(Sigma): ")
+    println(Deriv.x[2][:, 4])
+    # print("Vertex before OLW constructor: ")
+    # println(State.x[5][10, :, 4, 4, 4])
+
+    Workspace = OneWoopLorkspace(State, Deriv, X, Par)
+    # Workspace = OneLoopWorkspace(State, Deriv, X, Par)
+
+    # print("Vertex after OLW constructor: ")
+    # println(State.x[5][10, :, 4, 4, 4])
 
     println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
@@ -922,6 +967,13 @@ function getDeriv!(Deriv, State, setup, Lam)
 
     println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
+    println(Workspace.X[fd_["xy2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["xy2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["xz2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["yx2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["yz2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["zx2"], :, 4, 4, 4])
+    println(Workspace.X[21 + fd_["zy2"], :, 4, 4, 4])
 
     println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
@@ -929,7 +981,7 @@ function getDeriv!(Deriv, State, setup, Lam)
     println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
 
-    println("======== symmetrizeVertex ========")
+    println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
     return
 end
@@ -981,14 +1033,32 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     t0 = Lam_to_t(lambda_max)
     tend = get_t_min(lambda_min)
     Deriv_subst! = generateSubstituteDeriv(Deriv!)
-    
-    println(typeof(Deriv_subst!))
-    println(typeof(State))
-    println(typeof(setup))
+
+    # println(State.x[5][10, :, 4, 4, 4]) ### State is OK at this stage
 
     problem = ODEProblem(Deriv_subst!, State, (t0, tend), setup) # function, initial state, timespan, ??
     sol = solve(problem, method, reltol = accuracy, abstol = accuracy, save_everystep = true, dt=Lam_to_t(0.2 * lambda_max))
     return sol
+end
+
+function testPMFRG!(State, setup, Deriv!::Function)
+    Par = setup[end]
+    (; lambda_max, lambda_min, accuracy) = Par.NumericalParams
+
+    t0 = Lam_to_t(lambda_max)
+    tend = get_t_min(lambda_min)
+    Deriv_subst! = generateSubstituteDeriv(Deriv!)
+
+    der = copy(State)
+    setZero!(der)
+
+    println(State.x[2][:, 4])
+    println(der.x[2][:, 4])
+
+    Deriv_subst!(der, State, setup, t0)
+
+    println(State.x[2][:, 4])
+    println(der.x[2][:, 4])
 end
 
 SolveFRG(Par, couplings; kwargs...) = launchPMFRG!(InitializeState(Par, couplings),AllocateSetup(Par),getDeriv!; kwargs...)
@@ -1010,6 +1080,8 @@ function generateSubstituteDeriv(getDeriv!::Function)
 end
 
 function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector) where T
+    println("Setting bare vertex")
+
     for Rj in axes(Gamma,2)
         Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[Rj][1]
         Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[Rj][1]
@@ -1025,6 +1097,8 @@ function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector) 
         Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[Rj][3]
         Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[Rj][3]
     end
+
+    println(Gamma[10, :, 4, 4, 4])
     return Gamma
 end
 
@@ -1094,6 +1168,7 @@ Par = Params( #create a group of all parameters to pass them to the FRG Solver
     lambda_min = .01
 )
 
+testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!)
 @time sol = SolveFRG(Par, couplings, method = DP5());
 
 ## Evaluation Dimer Susc
