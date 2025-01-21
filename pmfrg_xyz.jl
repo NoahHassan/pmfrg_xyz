@@ -1,17 +1,12 @@
-### pinned SpinFRGLattices at v0.5.2
-import Pkg;
-Pkg.add("SpinFRGLattices")
-
-Pkg.add("OrdinaryDiffEq")
-Pkg.add("RecursiveArrayTools")
-Pkg.add("CairoMakie")
-Pkg.add("DiffEqCallbacks")
-
-using RecursiveArrayTools
-
 #################################################
 ######### STRUCTS ## STRUCTS ## STRUCTS #########
 #################################################
+
+using JLD2
+using RecursiveArrayTools
+using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
+using SpinFRGLattices.StaticArrays
+using CairoMakie
 
 setZero!(a::AbstractArray{T,N}) where {T,N} = fill!(a,zero(T))
 
@@ -177,9 +172,9 @@ function get_w(nw, T)
 end
 
 function get_sign_iw(nw::Integer,N::Integer)
-# s = sign(nw)
-nw_bounds = min(nw, N - 1)  ### used to be min(abs(nw),...), but nw is set positive in gamma
-return nw_bounds + 1        ### used to be s * ...
+    # s = sign(nw)
+    nw_bounds = min(nw, N - 1)  ### used to be min(abs(nw),...), but nw is set positive in gamma
+    return nw_bounds + 1        ### used to be s * ...
 end
 
 ### Sigma inputted as State.iSigma, which is Array{T, 2}
@@ -230,7 +225,7 @@ end
 
 using LinearAlgebra
 
-function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji::Integer, N::Integer)
+function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji::Integer, N::Integer; isX=false)
 
     ### Compute the matrices, lets say M is found
     ### Then return M * Vertex[:, Rij, ns + 1, nt + 1, nu + 1]
@@ -372,7 +367,7 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 	N = Par.NumericalParams.N
 	(; Npairs, Nsum, siteSum, invpairs) = Par.System
 
-    Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N)
+    Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N; isX=true)
 	ns = is - 1 ### because julia indexes from 1
 	nt = it - 1
 	nu = iu - 1
@@ -387,6 +382,7 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 	for Rij in 1:Npairs
 		#loop over all left hand side inequivalent pairs Rij
         X_sum = zeros(42)
+        sumsum = 0
 		for k_spl in 1:Nsum[Rij]
 			#loop over all Nsum summation elements defined in geometry. This inner loop is responsible for most of the computational effort! 
 			ki,kj,m,xk = S_ki[k_spl,Rij],S_kj[k_spl,Rij],S_m[k_spl,Rij],S_xk[k_spl,Rij]
@@ -395,6 +391,14 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             V12 = Vert(ki, ns, wpw1, -wpw2)
             V34 = Vert(kj, ns, -wmw3, -wmw4)
 
+            ### After one iteration, X_a has 5.1449264130441797e-20, while X_b has 2.5724632065220898e-20
+            ### Subtracting the last term gives X_a as 2.5724632065220898e-20 too. Hence the only possibility
+            ### is, that the error must lie in V[fd_["xy1"]], i.e. in Gamma_b
+            ### But Gamma_b is identically zero. So whats going on here?
+
+            ### addition: After the first iteration, all vertices, i.e. Gamma[n, :, w, w, w] for n in 1:21, w in 1:8
+            ### all have zeros from Gamma_aa to Gamma_ab1, so it is not possible for V12[fd_["xy1"]] to be non-zero, but
+            ### here we are.
             X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["xy1"]] * V34[fd_["yx1"]] * Ptm[2, 2] - V12[fd_["xz1"]] * V34[fd_["zx1"]] * Ptm[3, 3]
             X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["yz1"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["yx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
             X_sum[fd_["zz"]] += -V12[fd_["zz"]] * V34[fd_["zz"]] * Ptm[3, 3] - V12[fd_["zx1"]] * V34[fd_["xz1"]] * Ptm[1, 1] - V12[fd_["zy1"]] * V34[fd_["yz1"]] * Ptm[2, 2]
@@ -407,21 +411,21 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             X_sum[fd_["zx1"]] += -V12[fd_["zz"]] * V34[fd_["zx1"]] * Ptm[3, 3] - V12[fd_["zx1"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["zy1"]] * V34[fd_["yx1"]] * Ptm[2, 2]
             X_sum[fd_["zy1"]] += -V12[fd_["zz"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["zy1"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["zx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
             
-            ### Xab2 = -Vab3 Vab2 - Vab2 Vba3
-            X_sum[fd_["xy2"]] += -V12[fd_["xy3"]] * V34[fd_["xy2"]] * Ptm[2, 1] - V12[fd_["xy2"]] * V34[fd_["yx3"]] * Ptm[1, 2]
-            X_sum[fd_["xz2"]] += -V12[fd_["xz3"]] * V34[fd_["xz2"]] * Ptm[3, 1] - V12[fd_["xz2"]] * V34[fd_["zx3"]] * Ptm[1, 3]
-            X_sum[fd_["yx2"]] += -V12[fd_["yx3"]] * V34[fd_["yx2"]] * Ptm[1, 2] - V12[fd_["yx2"]] * V34[fd_["xy3"]] * Ptm[2, 1]
-            X_sum[fd_["yz2"]] += -V12[fd_["yz3"]] * V34[fd_["yz2"]] * Ptm[3, 2] - V12[fd_["yz2"]] * V34[fd_["zy3"]] * Ptm[2, 3]
-            X_sum[fd_["zx2"]] += -V12[fd_["zx3"]] * V34[fd_["zx2"]] * Ptm[1, 3] - V12[fd_["zx2"]] * V34[fd_["xz3"]] * Ptm[3, 1]
-            X_sum[fd_["zy2"]] += -V12[fd_["zy3"]] * V34[fd_["zy2"]] * Ptm[2, 3] - V12[fd_["zy2"]] * V34[fd_["yz3"]] * Ptm[3, 2]
+            ### Xab2 = -Vab2 Vab2 - Vab3 Vba3
+            X_sum[fd_["xy2"]] += -V12[fd_["xy2"]] * V34[fd_["xy2"]] * Ptm[2, 1] - V12[fd_["xy3"]] * V34[fd_["yx3"]] * Ptm[1, 2]
+            X_sum[fd_["xz2"]] += -V12[fd_["xz2"]] * V34[fd_["xz2"]] * Ptm[3, 1] - V12[fd_["xz3"]] * V34[fd_["zx3"]] * Ptm[1, 3]
+            X_sum[fd_["yx2"]] += -V12[fd_["yx2"]] * V34[fd_["yx2"]] * Ptm[1, 2] - V12[fd_["yx3"]] * V34[fd_["xy3"]] * Ptm[2, 1]
+            X_sum[fd_["yz2"]] += -V12[fd_["yz2"]] * V34[fd_["yz2"]] * Ptm[3, 2] - V12[fd_["yz3"]] * V34[fd_["zy3"]] * Ptm[2, 3]
+            X_sum[fd_["zx2"]] += -V12[fd_["zx2"]] * V34[fd_["zx2"]] * Ptm[1, 3] - V12[fd_["zx3"]] * V34[fd_["xz3"]] * Ptm[3, 1]
+            X_sum[fd_["zy2"]] += -V12[fd_["zy2"]] * V34[fd_["zy2"]] * Ptm[2, 3] - V12[fd_["zy3"]] * V34[fd_["yz3"]] * Ptm[3, 2]
 
-            ### Xab3 = -Vab3 Vab3 - Vab2 Vba2
-            X_sum[fd_["xy3"]] += -V12[fd_["xy3"]] * V34[fd_["xy3"]] * Ptm[2, 1] - V12[fd_["xy2"]] * V34[fd_["yx2"]] * Ptm[1, 2]
-            X_sum[fd_["xz3"]] += -V12[fd_["xz3"]] * V34[fd_["xz3"]] * Ptm[3, 1] - V12[fd_["xz2"]] * V34[fd_["zx2"]] * Ptm[1, 3]
-            X_sum[fd_["yx3"]] += -V12[fd_["yx3"]] * V34[fd_["yx3"]] * Ptm[1, 2] - V12[fd_["yx2"]] * V34[fd_["xy2"]] * Ptm[2, 1]
-            X_sum[fd_["yz3"]] += -V12[fd_["yz3"]] * V34[fd_["yz3"]] * Ptm[3, 2] - V12[fd_["yz2"]] * V34[fd_["zy2"]] * Ptm[2, 3]
-            X_sum[fd_["zx3"]] += -V12[fd_["zx3"]] * V34[fd_["zx3"]] * Ptm[1, 3] - V12[fd_["zx2"]] * V34[fd_["xz2"]] * Ptm[3, 1]
-            X_sum[fd_["zy3"]] += -V12[fd_["zy3"]] * V34[fd_["zy3"]] * Ptm[2, 3] - V12[fd_["zy2"]] * V34[fd_["yz2"]] * Ptm[3, 2]
+            ### Xab3 = -Vab2 Vab3 - Vab3 Vba2
+            X_sum[fd_["xy3"]] += -V12[fd_["xy2"]] * V34[fd_["xy3"]] * Ptm[2, 1] - V12[fd_["xy3"]] * V34[fd_["yx2"]] * Ptm[1, 2]
+            X_sum[fd_["xz3"]] += -V12[fd_["xz2"]] * V34[fd_["xz3"]] * Ptm[3, 1] - V12[fd_["xz3"]] * V34[fd_["zx2"]] * Ptm[1, 3]
+            X_sum[fd_["yx3"]] += -V12[fd_["yx2"]] * V34[fd_["yx3"]] * Ptm[1, 2] - V12[fd_["yx3"]] * V34[fd_["xy2"]] * Ptm[2, 1]
+            X_sum[fd_["yz3"]] += -V12[fd_["yz2"]] * V34[fd_["yz3"]] * Ptm[3, 2] - V12[fd_["yz3"]] * V34[fd_["zy2"]] * Ptm[2, 3]
+            X_sum[fd_["zx3"]] += -V12[fd_["zx2"]] * V34[fd_["zx3"]] * Ptm[1, 3] - V12[fd_["zx3"]] * V34[fd_["xz2"]] * Ptm[3, 1]
+            X_sum[fd_["zy3"]] += -V12[fd_["zy2"]] * V34[fd_["zy3"]] * Ptm[2, 3] - V12[fd_["zy3"]] * V34[fd_["yz2"]] * Ptm[3, 2]
 
 			# X_sum .*= Ptm ### attention. Something could go wrong here
             # I KNEW IT!!!
@@ -432,7 +436,7 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
     return
 end
 
-function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
+function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props; _l=1.0)
 	(; State, X, Par) = Workspace
 	N = Par.NumericalParams.N
 	(; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
@@ -466,7 +470,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 
         X_sum = zeros(42, Npairs, N, N, N)
 
-        ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t) 
+        ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t)
 
         X_sum[21 + fd_["xx"], Rij, is, it, iu] += ( ### add 21 because this is X_sum[21 + n] = Y[n]
             (V13[fd_["xx"]] * V24[fd_["xx"]] * P_(1, 1)
@@ -507,6 +511,14 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             + (V31[fd_["xy3"]] * V42[fd_["xy3"]] * PT_(2, 1)
             + V31[fd_["xy1"]] * V42[fd_["xy1"]] * PT_(1, 2))
         )
+
+        if(Rij == 1 && ns == 7 && nt == 7 && nu == 7)
+            print((V13[fd_["xy3"]] * V24[fd_["xy3"]] * P_(2, 1)
+            + V13[fd_["xy1"]] * V24[fd_["xy1"]] * P_(1, 2))
+
+            + (V31[fd_["xy3"]] * V42[fd_["xy3"]] * PT_(2, 1)
+            + V31[fd_["xy1"]] * V42[fd_["xy1"]] * PT_(1, 2)))
+        end
 
         X_sum[21 + fd_["xz1"], Rij, is, it, iu] += (
             (V13[fd_["xz3"]] * V24[fd_["xz3"]] * P_(3, 1)
@@ -703,7 +715,8 @@ function getXBubble!(Workspace, Lam)
 			BubbleProp[i, j, 3, 3] = iSKatz(i, nw1) * iGz(j, nw2) * T
 		end
 
-        return BubbleProp
+        ### Relative minus sign between paper & Nils' thesis
+        return -BubbleProp
 		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
         ### SMatrix can only create 2d array (according to ChatGPT). Use SArray instead
 	end
@@ -713,22 +726,31 @@ function getXBubble!(Workspace, Lam)
         ns = is - 1
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
-            sprop = getKataninProp!(BubbleProp,nw,nw+ns)
+            spropX = getKataninProp!(BubbleProp,nw,nw+ns)
+            spropY = getKataninProp!(BubbleProp,nw,nw-nt)
             for iu in 1:N
                 nu = iu - 1
                 if (ns+nt+nu)%2 == 0	# skip unphysical bosonic frequency combinations
                     continue
                 end
-                addY!(Workspace, is, it, iu, nw, sprop) # add to XTilde-type bubble functions
+                addY!(Workspace, is, it, iu, nw, spropY, _l=Lam) # add to XTilde-type bubble functions
 
                 ### If no u--t symmetry, then add all the bubbles
                 ### If use u--t symmetry, then only add for nu smaller then nt (all other obtained by symmetry)
                 # if(!Par.Options.use_symmetry || nu<=nt)
-                addX!(Workspace, is, it, iu, nw, sprop)
+
+                addX!(Workspace, is, it, iu, nw, spropX)
                 # end
             end
         end
 	end
+
+    # for w in 1:8
+    #     print("$w: \n")
+    #     for n in 1:21
+    #         println(Workspace.State.Gamma[n, :, w, w, w])
+    #     end
+    # end
 end
 
 function symmetrizeBubble!(X::Array{T, 5}, Par) where {T}
@@ -751,13 +773,13 @@ function symmetrizeBubble!(X::Array{T, 5}, Par) where {T}
     #local definitions of X.Tilde vertices
     for iu in 1:N
 		for it in 1:N, is in 1:N, R in OnsitePairs
-            X[21 + 1, R, is, it, iu] = X[1, R, it, is, iu]  ###
-            X[21 + 2, R, is, it, iu] = X[2, R, it, is, iu]  ### Yaa = Xaa
-            X[21 + 3, R, is, it, iu] = X[3, R, it, is, iu]  ###
+            X[21 + 1, R, is, it, iu] = -X[1, R, it, is, iu]  ###
+            X[21 + 2, R, is, it, iu] = -X[2, R, it, is, iu]  ### Yaa = Xaa
+            X[21 + 3, R, is, it, iu] = -X[3, R, it, is, iu]  ###
             for n in 1:6
-                X[21 + 3 + n, R, is, it, iu] = X[9 + n, R, it, is, iu]      ### Yab1 = Xab2
-                X[21 + 9 + n, R, is, it, iu] = X[3 + n, R, it, is, iu]      ### Yab2 = Xab1
-                X[21 + 15 + n, R, is, it, iu] = X[15 + n, R, it, is, iu]    ### Yab3 = Xab3
+                X[21 + 3 + n, R, is, it, iu] = -X[9 + n, R, it, is, iu]      ### Yab1 = Xab2
+                X[21 + 9 + n, R, is, it, iu] = -X[3 + n, R, it, is, iu]      ### Yab2 = Xab1
+                X[21 + 15 + n, R, is, it, iu] = -X[15 + n, R, it, is, iu]    ### Yab3 = Xab3
             end
 			# X.Ta[R,is,it,iu] = X.a[R,is,it,iu]
 			# X.Tb[R,is,it,iu] = X.b[R,is,it,iu]
@@ -803,7 +825,9 @@ function symmetrizeVertex!(Gamma::Array{T, 5},Par) where {T}
 	N = Par.NumericalParams.N
 	for iu in 1:N
 		for it in 1:N, is in 1:N, R in Par.System.OnsitePairs
-			Gamma[:, R, is, it, iu] .= -Gamma[:, R, it, is, iu]
+            for n in 1:6
+			    Gamma[9 + n, R, is, it, iu] = -Gamma[3 + n, R, it, is, iu] ### V^ii_ab2 = -V^ii_ab1
+            end
 		end
 	end
 end
@@ -943,21 +967,19 @@ function OneWoopLorkspace(State, Deriv, X, Par)
 end
 
 using JLD2
-function getDeriv!(Deriv, State, setup, Lam)
+function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
+
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
 
-    print("Sigma: ")
-    println(State.x[2][:, 4])
-    print("D(Sigma): ")
-    println(Deriv.x[2][:, 4])
-    # print("Vertex before OLW constructor: ")
-    # println(State.x[5][10, :, 4, 4, 4])
-
     Workspace = OneWoopLorkspace(State, Deriv, X, Par)
-    # Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
-    # print("Vertex after OLW constructor: ")
-    # println(State.x[5][10, :, 4, 4, 4])
+    # println("Saving gamma")
+    # save_object("noahGammaIt2.jld2", Workspace.State.Gamma)
+
+    # println("sleeping")
+    # sleep(5)
+
+    println(Workspace.State.Gamma[10, :, 8, 8, 8])
 
     println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
@@ -967,22 +989,24 @@ function getDeriv!(Deriv, State, setup, Lam)
 
     println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
-    println(Workspace.X[fd_["xy2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["xy2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["xz2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["yx2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["yz2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["zx2"], :, 4, 4, 4])
-    println(Workspace.X[21 + fd_["zy2"], :, 4, 4, 4])
 
+    # save_object("noahX.jld2", Workspace.X)
+    
     println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
+
+    # save_object("noahXSymm.jld2", Workspace.X)
 
     println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
 
+    # save_object("noahDeriv.jld2", Workspace.Deriv.Gamma)
+
     println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
+
+    # save_object("noahDerivSymm.jld2", Workspace.Deriv.Gamma)
+
     return
 end
 
@@ -1041,7 +1065,7 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     return sol
 end
 
-function testPMFRG!(State, setup, Deriv!::Function)
+function testPMFRG!(State, setup, Deriv!::Function; loadArgs = false)
     Par = setup[end]
     (; lambda_max, lambda_min, accuracy) = Par.NumericalParams
 
@@ -1052,13 +1076,15 @@ function testPMFRG!(State, setup, Deriv!::Function)
     der = copy(State)
     setZero!(der)
 
-    println(State.x[2][:, 4])
-    println(der.x[2][:, 4])
+    if(loadArgs)
+        args = load_object("noah_flow_args.jld2")
+        der = args[1]
+        State = args[2]
+        setup = args[3]
+        t0 = args[4]
+    end
 
-    Deriv_subst!(der, State, setup, t0)
-
-    println(State.x[2][:, 4])
-    println(der.x[2][:, 4])
+    Deriv_subst!(der, State, setup, t0, s=false)
 end
 
 SolveFRG(Par, couplings; kwargs...) = launchPMFRG!(InitializeState(Par, couplings),AllocateSetup(Par),getDeriv!; kwargs...)
@@ -1070,9 +1096,9 @@ end
 
 function generateSubstituteDeriv(getDeriv!::Function)
     
-    function DerivSubs!(Deriv,State,par,t)
+    function DerivSubs!(Deriv,State,par,t; s=true)
         Lam = t_to_Lam(t)
-        a = getDeriv!(Deriv,State,par,Lam)
+        a = getDeriv!(Deriv,State,par,Lam, saveArgs=s)
         Deriv .*= Lam
         a
     end
@@ -1142,19 +1168,9 @@ function getChi(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractA
 	return(Chi)
 end
 
-
-Pkg.add("StructArrays")
-Pkg.add("JLD2")
-
-using JLD2
-
 ##########################################################
 ######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
 ##########################################################
-
-using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
-using SpinFRGLattices.StaticArrays
-using CairoMakie
 
 System = getPolymer(2) # create a structure that contains all information about the geometry of the problem.
 couplings = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
@@ -1168,48 +1184,54 @@ Par = Params( #create a group of all parameters to pass them to the FRG Solver
     lambda_min = .01
 )
 
-testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!)
+testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!, loadArgs = false)
+
 @time sol = SolveFRG(Par, couplings, method = DP5());
 
-## Evaluation Dimer Susc
+# ## Evaluation Dimer Susc
 
 tr = LinRange(3,-2,20)
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
+# save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
 
-chiR = [getChi(sol(t),exp(t),Par) for t in tr] # getting susceptibility
+sol = load_object("dimer_flow_noah.jld2")
+
+chiR = [getChi(s...) for s in sol] # getting susceptibility
+chiRY = load_object("yannik_chi.jld2")
 fig = Figure()
 ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
 
 scatterlines!(ax,exp.(tr),getindex.(chiR,1))
-# scatterlines!(ax,exp.(tr),getindex.(chiR,2))
+scatterlines!(ax,exp.(tr),getindex.(chiR,2))
+scatterlines!(ax,exp.(tr),getindex.(chiRY,1))
+scatterlines!(ax,exp.(tr),getindex.(chiRY,2))
 display("image/png", fig)
 
 ######################################################################
 ######### SQUARE LATTICE ## SQUARE LATTICE ## SQUARE LATTICE #########
 ######################################################################
 
-using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
-using SpinFRGLattices.StaticArrays
-using SpinFRGLattices.SquareLattice
+# using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
+# using SpinFRGLattices.StaticArrays
+# using SpinFRGLattices.SquareLattice
 
-NLen = 5 # Number of nearest neighbor bonds up to which correlations are treated in the lattice. For NLen = 5, all correlations C_{ij} are zero if sites i and j are separated by more than 5 nearest neighbor bonds.
-J1 = 1
-J2 = 0.1
-couplings = [J1,J2] # Construct a vector of couplings: nearest neighbor coupling is J1 (J2) and further couplings to zero. For finite further couplings simply provide a longer array, i.e [J1,J2,J3,...]
+# NLen = 5 # Number of nearest neighbor bonds up to which correlations are treated in the lattice. For NLen = 5, all correlations C_{ij} are zero if sites i and j are separated by more than 5 nearest neighbor bonds.
+# J1 = 1
+# J2 = 0.1
+# couplings = [J1,J2] # Construct a vector of couplings: nearest neighbor coupling is J1 (J2) and further couplings to zero. For finite further couplings simply provide a longer array, i.e [J1,J2,J3,...]
 
-System = getSquareLattice(NLen,couplings) # create a structure that contains all information about the geometry of the problem. 
-println(System)
+# System = getSquareLattice(NLen,couplings) # create a structure that contains all information about the geometry of the problem. 
+# println(System)
 
-Par = Params( #create a group of all parameters to pass them to the FRG Solver
-    System, # geometry, this is always required
-    T=0.5, # Temperature for the simulation.
-    lambda_max = exp(10.),
-    lambda_min = exp(-10.),
-    N = 8, # Number of positive Matsubara frequencies for the four-point vertex.
-    accuracy = 1e-3,
-)
+# Par = Params( #create a group of all parameters to pass them to the FRG Solver
+#     System, # geometry, this is always required
+#     T=0.5, # Temperature for the simulation.
+#     lambda_max = exp(10.),
+#     lambda_min = exp(-10.),
+#     N = 8, # Number of positive Matsubara frequencies for the four-point vertex.
+#     accuracy = 1e-3,
+# )
 
-@time sol = SolveFRG(Par,method = DP5());
+# @time sol = SolveFRG(Par,method = DP5());
 
 # ## Evaluation Square lattice
 # @time begin
