@@ -1,6 +1,8 @@
 #################################################
 ######### STRUCTS ## STRUCTS ## STRUCTS #########
 #################################################
+import Pkg;
+Pkg.activate(".")
 
 using JLD2
 using RecursiveArrayTools
@@ -15,7 +17,6 @@ function setZero!(PartArr::ArrayPartition)
         fill!(arr,0.)
     end
 end
-# for arrays like [[1,2,3], [4,5,6]]
 
 """Recursively sets structure to zero"""
 function setZero!(a::T) where T
@@ -25,29 +26,6 @@ function setZero!(a::T) where T
     return a
 end
 
-### A vertex will now be an Array{T, 5} with the first index
-### labelling the flavor
-
-# struct VertexType{T}
-#     a::Array{T, 4}
-#     b::Array{T, 4}
-#     c::Array{T, 4}
-# end
-
-### There will now be 24 Bubbles (yey!)
-### Also stored as an Array{T, 5}
-
-# struct BubbleType{T}
-#     a::Array{T, 4}
-#     b::Array{T, 4}
-#     c::Array{T, 4}
-
-#     Ta::Array{T, 4}
-#     Tb::Array{T, 4}
-#     Tc::Array{T, 4}
-#     Td::Array{T, 4}
-# end
-
 struct SigmaType{T}
     x::Array{T, 2}
     y::Array{T, 2}
@@ -55,18 +33,18 @@ struct SigmaType{T}
 end
 
 struct StateType{T}
-    f_int::Array{T}         ### additional index in f, Sigma and Gamma for inequivalent sites (x in geometry package)
+    f_int::Vector{T}
     iSigma::SigmaType{T}
     Gamma::Array{T, 5}
 end
 
-struct NumericalParams
-    T::Real             ### temperature
-    N::Integer          ### number of matsubara freqs
+struct NumericalParams{T<:Real}
+    T::T
+    N::Int
 
-    accuracy::Real
-    lambda_min::Real
-    lambda_max::Real
+    accuracy::T
+    lambda_min::T
+    lambda_max::T
 
     lenIntw::Int
     lenIntw_acc::Int
@@ -77,38 +55,15 @@ struct OptionParams
     minimal_output::Bool
 end
 
-struct OneLoopParams
-    System
-    NumericalParams::NumericalParams
+struct OneLoopParams_1{T,SType}
+    System::SType
+    NumericalParams::NumericalParams{T}
     Options::OptionParams
 end
 
 getVDims(Par) = (21, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 getBubbleVDims(Par) = (42, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 _getFloatType(Par) = typeof(Par.NumericalParams.T)
-
-# function VertexType(VDims::Tuple)
-#     return VertexType(
-#         zeros(VDims),
-#         zeros(VDims),
-#         zeros(VDims)
-#     )
-# end
-# VertexType(Par) = VertexType(getVDims(Par))
-
-# function BubbleType(VDims::Tuple, type=Float64)
-#     return BubbleType(
-#         zeros(type, VDims),
-#         zeros(type, VDims),
-#         zeros(type, VDims),
-
-#         zeros(type, VDims),
-#         zeros(type, VDims),
-#         zeros(type, VDims),
-#         zeros(type, VDims)
-#     )
-# end
-# BubbleType(Par) = BubbleType(getVDims(Par))
 
 function SigmaType(NUnique::Int, N::Int, type=Float64)
     return SigmaType(
@@ -132,7 +87,7 @@ RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma.x, x.iS
 StateType(Arr::ArrayPartition) = StateType(Arr.x...)
 
 function NumericalParams(;
-    T::Real = 0.5, # Temperature
+    T::Real = 0.5,
     N::Integer = 24,
 
     accuracy = 1e-6,
@@ -157,7 +112,7 @@ function NumericalParams(;
 end
 
 OptionParams(;use_symmetry::Bool = true,MinimalOutput::Bool = false,kwargs...) = OptionParams(use_symmetry,MinimalOutput)
-Params(System;kwargs...) = OneLoopParams(System,NumericalParams(;kwargs...),OptionParams(;kwargs...))
+Params(System;kwargs...) = OneLoopParams_1(System,NumericalParams(;kwargs...),OptionParams(;kwargs...))
 
 #############################################################
 ######### PROPAGATORS ## PROPAGATORS ## PROPAGATORS #########
@@ -224,94 +179,96 @@ function ConvertFreqArgs(ns, nt, nu, Nw)
 end
 
 using LinearAlgebra
+using SparseArrays
+
+const MS_ = float([
+    1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+    0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+    0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+    0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+    0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+    0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+    0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
+    0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
+    0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
+    0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
+])
+
+const MT_ = float([
+    1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+    0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+    0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+    0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+    0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+    0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+    0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### xy2
+    0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### xz2
+    0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### yx2
+    0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### yz2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### zx2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### zy2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
+])
+
+const MU_ = float([
+    1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+    0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
+    0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
+    0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
+    0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
+    0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
+    0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
+    0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
+    0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
+    0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
+    0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### xy3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### xz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### yx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0; ### yz3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### zx3
+    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### zy3
+])
 
 function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji::Integer, N::Integer; isX=false)
 
     ### Compute the matrices, lets say M is found
     ### Then return M * Vertex[:, Rij, ns + 1, nt + 1, nu + 1]
 
-    MS_ = [
-        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
-        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
-        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
-        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
-        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
-        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
-        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
-        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
-        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
-        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
-    ]
-
-    MT_ = [
-        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
-        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
-        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
-        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
-        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
-        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
-        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### xy2
-        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### xz2
-        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### yx2
-        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### yz2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### zx2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### zy2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### xy3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### xz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### yx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### yz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### zx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0  ### zy3
-    ]
-
-    MU_ = [
-        1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xy1
-        0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0; ### xz1
-        0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### yx1
-        0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0; ### yz1
-        0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zx1
-        0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0; ### zy1
-        0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0; ### xy2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0; ### xz2
-        0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0; ### yx2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0; ### yz2
-        0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0; ### zx2
-        0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0; ### zy2
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; ### xy3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; ### xz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0; ### yx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0; ### yz3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0; ### zx3
-        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1; ### zy3
-    ]
 
     FlavorTransform = Matrix{Float64}(I, 21, 21)
 
     if ns < 0
-        FlavorTransform = MS_ * FlavorTransform
+        FlavorTransform .= MS_ * FlavorTransform
     end
     if nt < 0
-        FlavorTransform = MT_ * FlavorTransform
+        FlavorTransform .= MT_ * FlavorTransform
     end
     if nu < 0
-        FlavorTransform = MU_ * FlavorTransform
+        FlavorTransform .= MU_ * FlavorTransform
     end
 
     ns, nt, nu, swapsites = ConvertFreqArgs(ns, nt, nu, N)
@@ -337,7 +294,7 @@ function mixedFrequencies(ns,nt,nu,nwpr)
 	return wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4
 end
 
-fd_ = Dict(
+const fd_ = Dict(
     "xx" => 1,
     "yy" => 2,
     "zz" => 3,
@@ -361,14 +318,13 @@ fd_ = Dict(
     "zy3" => 21
 )
 
-### The X bubble containing the k sum
 function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
 	(; State, X, Par) = Workspace
 	N = Par.NumericalParams.N
 	(; Npairs, Nsum, siteSum, invpairs) = Par.System
 
     Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N; isX=true)
-	ns = is - 1 ### because julia indexes from 1
+	ns = is - 1
 	nt = it - 1
 	nu = iu - 1
 	wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
@@ -391,14 +347,6 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             V12 = Vert(ki, ns, wpw1, -wpw2)
             V34 = Vert(kj, ns, -wmw3, -wmw4)
 
-            ### After one iteration, X_a has 5.1449264130441797e-20, while X_b has 2.5724632065220898e-20
-            ### Subtracting the last term gives X_a as 2.5724632065220898e-20 too. Hence the only possibility
-            ### is, that the error must lie in V[fd_["xy1"]], i.e. in Gamma_b
-            ### But Gamma_b is identically zero. So whats going on here?
-
-            ### addition: After the first iteration, all vertices, i.e. Gamma[n, :, w, w, w] for n in 1:21, w in 1:8
-            ### all have zeros from Gamma_aa to Gamma_ab1, so it is not possible for V12[fd_["xy1"]] to be non-zero, but
-            ### here we are.
             X_sum[fd_["xx"]] += -V12[fd_["xx"]] * V34[fd_["xx"]] * Ptm[1, 1] - V12[fd_["xy1"]] * V34[fd_["yx1"]] * Ptm[2, 2] - V12[fd_["xz1"]] * V34[fd_["zx1"]] * Ptm[3, 3]
             X_sum[fd_["yy"]] += -V12[fd_["yy"]] * V34[fd_["yy"]] * Ptm[2, 2] - V12[fd_["yz1"]] * V34[fd_["zy1"]] * Ptm[3, 3] - V12[fd_["yx1"]] * V34[fd_["xy1"]] * Ptm[1, 1]
             X_sum[fd_["zz"]] += -V12[fd_["zz"]] * V34[fd_["zz"]] * Ptm[3, 3] - V12[fd_["zx1"]] * V34[fd_["xz1"]] * Ptm[1, 1] - V12[fd_["zy1"]] * V34[fd_["yz1"]] * Ptm[2, 2]
@@ -426,12 +374,9 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             X_sum[fd_["yz3"]] += -V12[fd_["yz2"]] * V34[fd_["yz3"]] * Ptm[3, 2] - V12[fd_["yz3"]] * V34[fd_["zy2"]] * Ptm[2, 3]
             X_sum[fd_["zx3"]] += -V12[fd_["zx2"]] * V34[fd_["zx3"]] * Ptm[1, 3] - V12[fd_["zx3"]] * V34[fd_["xz2"]] * Ptm[3, 1]
             X_sum[fd_["zy3"]] += -V12[fd_["zy2"]] * V34[fd_["zy3"]] * Ptm[2, 3] - V12[fd_["zy3"]] * V34[fd_["yz2"]] * Ptm[3, 2]
-
-			# X_sum .*= Ptm ### attention. Something could go wrong here
-            # I KNEW IT!!!
 		end
 
-		X[:, Rij, is, it, iu] .+= X_sum ### same here
+		X[:, Rij, is, it, iu] .+= X_sum
     end
     return
 end
@@ -442,7 +387,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 	(; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
 
     Vert(Rij, s, t, u) = V_(State.Gamma, s, t, u, Rij, invpairs[Rij], N)
-	ns = is - 1 ### because julia indexes from 1
+	ns = is - 1
 	nt = it - 1
 	nu = iu - 1
 	wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
@@ -463,7 +408,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         end
 
         V13 = Vert(Rij, -wmw1, nt, wmw3)
-        V24 = Vert(Rij, wpw2, -nt, -wpw4) ### potential problems due to -nt?
+        V24 = Vert(Rij, wpw2, -nt, -wpw4)
 
         V31 = Vert(Rij, wmw3, nt, -wmw1)
         V42 = Vert(Rij, -wpw4, -nt, wpw2)
@@ -472,10 +417,10 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 
         ### Yaa = Vaa Vaa + Vab2 Vab2 + Vac2 Vac2 + (w -- -w + t)
 
-        X_sum[21 + fd_["xx"], Rij, is, it, iu] += ( ### add 21 because this is X_sum[21 + n] = Y[n]
+        X_sum[21 + fd_["xx"], Rij, is, it, iu] += (
             (V13[fd_["xx"]] * V24[fd_["xx"]] * P_(1, 1)
             + V13[fd_["xy2"]] * V24[fd_["xy2"]] * P_(2, 2) 
-            + V13[fd_["xz2"]] * V24[fd_["xz2"]] * P_(3, 3)) ### Blind-copied props, potentially wrong
+            + V13[fd_["xz2"]] * V24[fd_["xz2"]] * P_(3, 3))
         
             + (V31[fd_["xx"]] * V42[fd_["xx"]] * PT_(1, 1)
             + V31[fd_["xy2"]] * V42[fd_["xy2"]] * PT_(2, 2) 
@@ -485,7 +430,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         X_sum[21 + fd_["yy"], Rij, is, it, iu] += (
             (V13[fd_["yy"]] * V24[fd_["yy"]] * P_(2, 2)
             + V13[fd_["yx2"]] * V24[fd_["yx2"]] * P_(1, 1)  
-            + V13[fd_["yz2"]] * V24[fd_["yz2"]] * P_(3, 3)) ### Blind-copied props, potentially wrong
+            + V13[fd_["yz2"]] * V24[fd_["yz2"]] * P_(3, 3))
         
             + (V31[fd_["yy"]] * V42[fd_["yy"]] * PT_(2, 2)
             + V31[fd_["yx2"]] * V42[fd_["yx2"]] * PT_(1, 1) 
@@ -495,7 +440,7 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         X_sum[21 + fd_["zz"], Rij, is, it, iu] += (
             (V13[fd_["zz"]] * V24[fd_["zz"]] * P_(3, 3)
             + V13[fd_["zx2"]] * V24[fd_["zx2"]] * P_(1, 1) 
-            + V13[fd_["zy2"]] * V24[fd_["zy2"]] * P_(2, 2)) ### Blind-copied props, potentially wrong
+            + V13[fd_["zy2"]] * V24[fd_["zy2"]] * P_(2, 2))
         
             + (V31[fd_["zz"]] * V42[fd_["zz"]] * PT_(3, 3)
             + V31[fd_["zx2"]] * V42[fd_["zx2"]] * PT_(1, 1)
@@ -561,18 +506,6 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         )
 
         ### Yab2 = Vaa Vba2 + Vab2 Vbb + Vac2 Vbc2 + (w -- -w + t)
-
-        # V24p = Vert(Rij, wpw2, nt, wpw4)
-        # V42p = Vert(Rij, -wpw4, nt, -wpw2)
-        # X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
-        #     (V13[fd_["xx"]] * V24p[fd_["xy2"]] * P_(1, 1)
-        #     + V13[fd_["xy2"]] * V24p[fd_["yy"]] * P_(2, 2)
-        #     + V13[fd_["xz2"]] * V24p[fd_["zy2"]] + P_(3, 3))
-
-        #     + (V31[fd_["xx"]] * V42p[fd_["xy2"]] * PT_(1, 1)
-        #     + V31[fd_["xy2"]] * V42p[fd_["yy"]] * PT_(2, 2)
-        #     + V31[fd_["xz2"]] * V42p[fd_["zy2"]] * PT_(3, 3))
-        # )
 
         X_sum[21 + fd_["xy2"], Rij, is, it, iu] += (
             (V13[fd_["xx"]] * V24[fd_["yx2"]] * P_(1, 1)
@@ -697,7 +630,6 @@ function getXBubble!(Workspace, Lam)
     iGy(x, nw) = iG_(Workspace.State.iSigma.y, x, Lam, nw, T)
     iGz(x, nw) = iG_(Workspace.State.iSigma.z, x, Lam, nw, T)
 
-    ### Does flavor type commute with differentiation in 1 / (G^-1 + iSigma) ? Probably
 	iSKatx(x,nw) = iSKat_(Workspace.State.iSigma.x, Workspace.Deriv.iSigma.x, x, Lam, nw, T)
 	iSKaty(x,nw) = iSKat_(Workspace.State.iSigma.y, Workspace.Deriv.iSigma.y, x, Lam, nw, T)
 	iSKatz(x,nw) = iSKat_(Workspace.State.iSigma.z, Workspace.Deriv.iSigma.z, x, Lam, nw, T)
@@ -744,13 +676,6 @@ function getXBubble!(Workspace, Lam)
             end
         end
 	end
-
-    # for w in 1:8
-    #     print("$w: \n")
-    #     for n in 1:21
-    #         println(Workspace.State.Gamma[n, :, w, w, w])
-    #     end
-    # end
 end
 
 function symmetrizeBubble!(X::Array{T, 5}, Par) where {T}
@@ -781,16 +706,10 @@ function symmetrizeBubble!(X::Array{T, 5}, Par) where {T}
                 X[21 + 9 + n, R, is, it, iu] = -X[3 + n, R, it, is, iu]      ### Yab2 = Xab1
                 X[21 + 15 + n, R, is, it, iu] = -X[15 + n, R, it, is, iu]    ### Yab3 = Xab3
             end
-			# X.Ta[R,is,it,iu] = X.a[R,is,it,iu]
-			# X.Tb[R,is,it,iu] = X.b[R,is,it,iu]
-			# X.Tc[R,is,it,iu] = X.c[R,is,it,iu]
-			# X.Td[R,is,it,iu] = -X.c[R,is,iu,it]
 		end
     end
-    # X.Td .= X.Ta .- X.Tb .- X.Tc
 end
 
-### Gamma = Gamma[flavortype, Rij, is, it, iu]
 function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5}) where {T}
     for iu in axes(Gamma,5)
         for it in axes(Gamma,4), is in axes(Gamma,3), Rij in axes(Gamma,2)
@@ -813,9 +732,6 @@ function addToVertexFromBubble!(Gamma::Array{T, 5}, X::Array{T, 5}) where {T}
                     - X[21 + 9 + n, Rij, is, iu, it]
                 )
             end
-            # Gamma.a[Rij,is,it,iu] += X.a[Rij,is,it,iu] - X.Ta[Rij,it,is,iu] + X.Ta[Rij,iu,is,it]
-            # Gamma.b[Rij,is,it,iu] += X.b[Rij,is,it,iu] - X.Tc[Rij,it,is,iu] + X.Tc[Rij,iu,is,it]
-            # Gamma.c[Rij,is,it,iu] += X.c[Rij,is,it,iu] - X.Tb[Rij,it,is,iu] + X.Td[Rij,iu,is,it]
         end
     end 
     return Gamma
@@ -858,12 +774,12 @@ function getDFint!(Workspace, Lam::Real)
 	for x in 1:NUnique
 		sumres = 0.
 		for nw in -lenIntw_acc:lenIntw_acc-1
-			w = get_w(nw,T) ### is computed in iS, iG and iSigma too.
-			sumres += iSx(x, nw) / iGy(x, nw) * Theta(Lam, w) * iSigmax(x, nw) / w # 1 / w is simply G_0 without Lambda (right?)
+			w = get_w(nw,T)
+			sumres += iSx(x, nw) / iGy(x, nw) * Theta(Lam, w) * iSigmax(x, nw) / w
             sumres += iSy(x, nw) / iGy(x, nw) * Theta(Lam, w) * iSigmay(x, nw) / w
             sumres += iSz(x, nw) / iGz(x, nw) * Theta(Lam, w) * iSigmaz(x, nw) / w
         end
-		Deriv.f_int[x] = -0.5 * T * sumres ### I divided the original by 3, because 3 flavors
+		Deriv.f_int[x] = -0.5 * T * sumres
 	end
 end
 
@@ -879,12 +795,7 @@ function compute1PartBubble!(Dgamma::SigmaType, Gamma::Array{T, 5}, Props, Par) 
     invpairs = Par.System.invpairs
 
 	setZero!(Dgamma)
-
-    #### WARUM HIER T, U, S ???????
-	# @inline Gamma_a(Rij,s,t,u) = V_(Gamma.a, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # Tilde-type can be obtained by permutation of vertices
-	# @inline Gamma_b(Rij,s,t,u) = V_(Gamma.b, t, u, s, Rij, invpairs[Rij], Par.NumericalParams.N) # cTilde corresponds to b type vertex!
     @inline Gamma_(Rij, s, t, u) = V_(Gamma, s, t, u, Rij, invpairs[Rij], Par.NumericalParams.N)
-
     addTo1PartBubble!(Dgamma, Gamma_, Props, Par)
 end
 
@@ -898,7 +809,7 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
     	for (x, Rx) in enumerate(OnsitePairs)
 			for nw in -lenIntw_acc:lenIntw_acc-1
 				jsum = zeros(3)
-				wpw1 = nw1 + nw + 1 #w + w1: Adding two fermionic Matsubara frequencies gives a +1 for the bosonic index
+				wpw1 = nw1 + nw + 1
 				wmw1 = nw - nw1
 				for k_spl in 1:Nsum[Rx]
 					(; m, ki, xk) = siteSum[k_spl, Rx]
@@ -907,7 +818,7 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
                         gam[fd_["xx"]] * Props[1](xk, nw)
                         + gam[fd_["yx1"]] * Props[2](xk, nw)
                         + gam[fd_["zx1"]] * Props[3](xk, nw)
-                    ) * m ### different m for all flavors? Probably not
+                    ) * m
                     jsum[fd_["yy"]] += (
                         gam[fd_["xy1"]] * Props[1](xk, nw)
                         + gam[fd_["yy"]] * Props[2](xk, nw)
@@ -919,46 +830,26 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
                         + gam[fd_["zz"]] * Props[3](xk, nw)
                     ) * m
 				end
-				Dgamma.x[x, iw1] += -T * jsum[1] #For the self-energy derivative, the factor of 1/2 must be in the propagator
+				Dgamma.x[x, iw1] += -T * jsum[1]
                 Dgamma.y[x, iw1] += -T * jsum[2]
                 Dgamma.z[x, iw1] += -T * jsum[3]
             end
 		end
 	end
-    # return Dgamma
 end
 
-# struct OneLoopWorkspace{T}
-#     State::StateType    ### Stores the current state
-#     Deriv::StateType    ### Stores the derivative
-#     X::Array{T, 5}      ### Stores the bubble function X and XTilde
-#     Par                 ### Params
-# end
-
-# function OneLoopWorkspace(Deriv,State,X,Par)
-#     setZero!(Deriv)
-#     setZero!(X)
-
-#     return OneLoopWorkspace(
-#         StateType(State.x...),
-#         StateType(Deriv.x...),
-#         X,
-#         Par
-#     )
-# end
-
-struct OneWoopLorkspace{T}
-    State::StateType    ### Stores the current state
-    Deriv::StateType    ### Stores the derivative
-    X::Array{T, 5}      ### Stores the bubble function X and XTilde
-    Par                 ### Params
+struct OneLoopWorkspace{T,ParType}
+    State::StateType{T}
+    Deriv::StateType{T}
+    X::Array{T, 5}
+    Par::ParType
 end
 
-function OneWoopLorkspace(State, Deriv, X, Par)
+function OneLoopWorkspace(State, Deriv, X, Par)
     setZero!(Deriv)
     setZero!(X)
 
-    return OneWoopLorkspace(
+    return OneLoopWorkspace(
         StateType(State.x...),
         StateType(Deriv.x...),
         X,
@@ -971,15 +862,7 @@ function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
 
-    Workspace = OneWoopLorkspace(State, Deriv, X, Par)
-
-    # println("Saving gamma")
-    # save_object("noahGammaIt2.jld2", Workspace.State.Gamma)
-
-    # println("sleeping")
-    # sleep(5)
-
-    println(Workspace.State.Gamma[10, :, 8, 8, 8])
+    Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
     println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
@@ -989,23 +872,15 @@ function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
-
-    # save_object("noahX.jld2", Workspace.X)
     
     println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
 
-    # save_object("noahXSymm.jld2", Workspace.X)
-
     println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
 
-    # save_object("noahDeriv.jld2", Workspace.Deriv.Gamma)
-
     println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
-
-    # save_object("noahDerivSymm.jld2", Workspace.Deriv.Gamma)
 
     return
 end
@@ -1017,7 +892,7 @@ end
 t_to_Lam(t) = exp(t)
 Lam_to_t(t) = log(t)
 
-function AllocateSetup(Par::OneLoopParams)
+function AllocateSetup(Par::OneLoopParams_1)
     println("One Loop: T= ",Par.NumericalParams.T)
     ## Allocate Memory:
     floattype = _getFloatType(Par)
@@ -1031,18 +906,18 @@ function InitializeState(Par, multiCouplings)
     ( ; couplings, NUnique) = Par.System;
 
     VDims = getVDims(Par);
-    floattype = _getFloatType(Par)
+    #floattype = _getFloatType(Par)
 
     State = ArrayPartition(
-        zeros(floattype, NUnique),          ### f_int
-        zeros(floattype, NUnique, N),       ### iSigma_x
-        zeros(floattype, NUnique, N),       ### iSigma_y
-        zeros(floattype, NUnique, N),       ### iSigma_z
-        zeros(floattype, VDims),            ### Gamma
+        zeros(NUnique),          ### f_int
+        zeros(NUnique, N),       ### iSigma_x
+        zeros(NUnique, N),       ### iSigma_y
+        zeros(NUnique, N),       ### iSigma_z
+        zeros(VDims),            ### Gamma
     );
 
     Gamma = State.x[5]
-    setToBareVertex!(Gamma, multiCouplings)      ### sets initial conditions to couplings
+    setToBareVertex!(Gamma, multiCouplings)
     return State
 
 end
@@ -1057,8 +932,6 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     t0 = Lam_to_t(lambda_max)
     tend = get_t_min(lambda_min)
     Deriv_subst! = generateSubstituteDeriv(Deriv!)
-
-    # println(State.x[5][10, :, 4, 4, 4]) ### State is OK at this stage
 
     problem = ODEProblem(Deriv_subst!, State, (t0, tend), setup) # function, initial state, timespan, ??
     sol = solve(problem, method, reltol = accuracy, abstol = accuracy, save_everystep = true, dt=Lam_to_t(0.2 * lambda_max))
@@ -1132,14 +1005,13 @@ end
 ######### OBSERVABLES ## OBSERVABLES ## OBSERVABLES #########
 #############################################################
 
-struct Observables
-    Chi
-    gamma
+struct Observables{ChiType,gammatype}
+    Chi::ChiType
+    gamma::gammatype
 end
 
 getChi(State::ArrayPartition, Lam::Real, Par) = getChi(State.x[2], State.x[3], State.x[5], Lam, Par)
 
-### highly unlikely to be correct. Need to check again
 function getChi(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
 	(;T,N,lenIntw_acc) = Par.NumericalParams
 	(;Npairs,invpairs,PairTypes,OnsitePairs) = Par.System
@@ -1172,30 +1044,28 @@ end
 ######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
 ##########################################################
 
-System = getPolymer(2) # create a structure that contains all information about the geometry of the problem.
+System = getPolymer(2)
 couplings = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
 
-Par = Params( #create a group of all parameters to pass them to the FRG Solver
-    System, # geometry, this is always required
-    T = 0.5, # Temperature for the simulation.
-    N = 8, # Number of positive Matsubara frequencies for the four-point vertex.
+Par = Params(
+    System,
+    T = 0.5,
+    N = 8,
     accuracy = 1e-5,
     lambda_max = 100.,
     lambda_min = .01
 )
-
-testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!, loadArgs = false)
+##
+@time testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!, loadArgs = false)
 
 @time sol = SolveFRG(Par, couplings, method = DP5());
-
-# ## Evaluation Dimer Susc
+save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
 
 tr = LinRange(3,-2,20)
-# save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
 
 sol = load_object("dimer_flow_noah.jld2")
 
-chiR = [getChi(s...) for s in sol] # getting susceptibility
+chiR = [getChi(s...) for s in sol]
 chiRY = load_object("yannik_chi.jld2")
 fig = Figure()
 ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
@@ -1205,54 +1075,3 @@ scatterlines!(ax,exp.(tr),getindex.(chiR,2))
 scatterlines!(ax,exp.(tr),getindex.(chiRY,1))
 scatterlines!(ax,exp.(tr),getindex.(chiRY,2))
 display("image/png", fig)
-
-######################################################################
-######### SQUARE LATTICE ## SQUARE LATTICE ## SQUARE LATTICE #########
-######################################################################
-
-# using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
-# using SpinFRGLattices.StaticArrays
-# using SpinFRGLattices.SquareLattice
-
-# NLen = 5 # Number of nearest neighbor bonds up to which correlations are treated in the lattice. For NLen = 5, all correlations C_{ij} are zero if sites i and j are separated by more than 5 nearest neighbor bonds.
-# J1 = 1
-# J2 = 0.1
-# couplings = [J1,J2] # Construct a vector of couplings: nearest neighbor coupling is J1 (J2) and further couplings to zero. For finite further couplings simply provide a longer array, i.e [J1,J2,J3,...]
-
-# System = getSquareLattice(NLen,couplings) # create a structure that contains all information about the geometry of the problem. 
-# println(System)
-
-# Par = Params( #create a group of all parameters to pass them to the FRG Solver
-#     System, # geometry, this is always required
-#     T=0.5, # Temperature for the simulation.
-#     lambda_max = exp(10.),
-#     lambda_min = exp(-10.),
-#     N = 8, # Number of positive Matsubara frequencies for the four-point vertex.
-#     accuracy = 1e-3,
-# )
-
-# @time sol = SolveFRG(Par,method = DP5());
-
-# ## Evaluation Square lattice
-# @time begin
-    
-#     using PMFRGEvaluation
-#     using CairoMakie #for plotting. You can use whatever plotting package you like of course
-
-#     System = SquareLattice.getSquareLattice(NLen)
-#     Lattice = LatticeInfo(System,SquareLattice)
-#     let 
-#         chi_R = getChi(sol[end],Par.NumericalParams.lambda_min,Par)
-        
-#         chi = getFourier(chi_R,Lattice)
-        
-#         k = LinRange(-2pi,2pi,300)
-        
-#         chik = [chi(x,y) for x in k, y in k]
-        
-#         fig, ax, hm = heatmap(k,k,chik,axis = (;aspect = 1))
-#         Colorbar(fig[1,2],hm)
-#         fig
-#     end
-
-# end
