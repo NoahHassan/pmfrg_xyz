@@ -1045,7 +1045,7 @@ end
 ##########################################################
 
 System = getPolymer(2)
-couplings = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+couplings = [[0.0, 0.0, 0.0], [1.0, 0.6, 0.3]]
 
 Par = Params(
     System,
@@ -1059,9 +1059,9 @@ Par = Params(
 @time testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!, loadArgs = false)
 
 @time sol = SolveFRG(Par, couplings, method = DP5());
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tr])
+save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
 
-tr = LinRange(3,-2,20)
+tri = LinRange(3,-2,20)
 
 sol = load_object("dimer_flow_noah.jld2")
 
@@ -1070,8 +1070,34 @@ chiRY = load_object("yannik_chi.jld2")
 fig = Figure()
 ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
 
-scatterlines!(ax,exp.(tr),getindex.(chiR,1))
-scatterlines!(ax,exp.(tr),getindex.(chiR,2))
-scatterlines!(ax,exp.(tr),getindex.(chiRY,1))
-scatterlines!(ax,exp.(tr),getindex.(chiRY,2))
+scatterlines!(ax,exp.(tri),getindex.(chiR,1))
+scatterlines!(ax,exp.(tri),getindex.(chiR,2))
+scatterlines!(ax,exp.(tri),getindex.(chiRY,1))
+scatterlines!(ax,exp.(tri),getindex.(chiRY,2))
 display("image/png", fig)
+
+## Dimer against T
+
+System = getPolymer(2)
+couplings = [[0.0, 0.0, 0.0], [1.0, -0.6, 0.7]]
+
+trihi = LinRange(3,-2,20)
+Trange = 0.5:0.25:3.0
+
+for T in Trange
+    println("Solving at temperature $T...\n")
+    sleep(2.0)
+
+    Par = Params(
+        System,
+        T = T,
+        N = 8,
+        accuracy = 1e-5,
+        lambda_max = 100.,
+        lambda_min = .01
+    )
+
+    @time sol = SolveFRG(Par, couplings, method = DP5());
+    chiR = [getChi(sol(t), exp(t), Par) for t in trihi]
+    save_object("Tflow/flow$T.jld2", chiR)
+end
