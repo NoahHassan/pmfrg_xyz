@@ -900,7 +900,7 @@ function AllocateSetup(Par::OneLoopParams_1)
     return (X,Par)
 end
 
-function InitializeState(Par, multiCouplings)
+function InitializeState(Par, isotropy)
 
     N = Par.NumericalParams.N;
     ( ; couplings, NUnique) = Par.System;
@@ -917,7 +917,7 @@ function InitializeState(Par, multiCouplings)
     );
 
     Gamma = State.x[5]
-    setToBareVertex!(Gamma, multiCouplings)
+    setToBareVertex!(Gamma, couplings, isotropy)
     return State
 
 end
@@ -960,7 +960,7 @@ function testPMFRG!(State, setup, Deriv!::Function; loadArgs = false)
     Deriv_subst!(der, State, setup, t0, s=false)
 end
 
-SolveFRG(Par, couplings; kwargs...) = launchPMFRG!(InitializeState(Par, couplings),AllocateSetup(Par),getDeriv!; kwargs...)
+SolveFRG(Par, isotropy; kwargs...) = launchPMFRG!(InitializeState(Par, isotropy),AllocateSetup(Par),getDeriv!; kwargs...)
 
 function get_t_min(Lam)
     Lam < exp(-30) && @warn "lambda_min too small! Set to exp(-30) instead."
@@ -978,26 +978,23 @@ function generateSubstituteDeriv(getDeriv!::Function)
     
 end
 
-function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector) where T
-    println("Setting bare vertex")
-
+function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector, isotropy::Array{T}) where T
     for Rj in axes(Gamma,2)
-        Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[Rj][1]
-        Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[Rj][1]
-        Gamma[fd_["zx2"], Rj, :, :, :] .= -couplings[Rj][2]
-        Gamma[fd_["xz2"], Rj, :, :, :] .= -couplings[Rj][2]
-        Gamma[fd_["xy2"], Rj, :, :, :] .= -couplings[Rj][3]
-        Gamma[fd_["yx2"], Rj, :, :, :] .= -couplings[Rj][3]
+        Gamma[fd_["yz2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[1]
+        Gamma[fd_["zy2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[1]
+        Gamma[fd_["zx2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[2]
+        Gamma[fd_["xz2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[2]
+        Gamma[fd_["xy2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[3]
+        Gamma[fd_["yx2"], Rj, :, :, :] .= -couplings[Rj] * isotropy[3]
 
-        Gamma[fd_["yz3"], Rj, :, :, :] .= couplings[Rj][1]
-        Gamma[fd_["zy3"], Rj, :, :, :] .= couplings[Rj][1]
-        Gamma[fd_["zx3"], Rj, :, :, :] .= couplings[Rj][2]
-        Gamma[fd_["xz3"], Rj, :, :, :] .= couplings[Rj][2]
-        Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[Rj][3]
-        Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[Rj][3]
+        Gamma[fd_["yz3"], Rj, :, :, :] .= couplings[Rj] * isotropy[1]
+        Gamma[fd_["zy3"], Rj, :, :, :] .= couplings[Rj] * isotropy[1]
+        Gamma[fd_["zx3"], Rj, :, :, :] .= couplings[Rj] * isotropy[2]
+        Gamma[fd_["xz3"], Rj, :, :, :] .= couplings[Rj] * isotropy[2]
+        Gamma[fd_["xy3"], Rj, :, :, :] .= couplings[Rj] * isotropy[3]
+        Gamma[fd_["yx3"], Rj, :, :, :] .= couplings[Rj] * isotropy[3]
     end
 
-    println(Gamma[10, :, 4, 4, 4])
     return Gamma
 end
 
@@ -1045,7 +1042,7 @@ end
 ##########################################################
 
 System = getPolymer(2)
-couplings = [[0.0, 0.0, 0.0], [1.0, 0.6, 0.3]]
+isotropy = [1.0, 0.6, 0.3]
 
 Par = Params(
     System,
@@ -1056,9 +1053,9 @@ Par = Params(
     lambda_min = .01
 )
 ##
-@time testPMFRG!(InitializeState(Par, couplings), AllocateSetup(Par), getDeriv!, loadArgs = false)
+@time testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!, loadArgs = false)
 
-@time sol = SolveFRG(Par, couplings, method = DP5());
+@time sol = SolveFRG(Par, isotropy, method = DP5());
 save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
 
 tri = LinRange(3,-2,20)
@@ -1079,7 +1076,7 @@ display("image/png", fig)
 ## Dimer against T
 
 System = getPolymer(2)
-couplings = [[0.0, 0.0, 0.0], [1.0, -0.6, 0.7]]
+isotropy = [0.40824867 * 2.0, 0.40824867, -0.40824867]
 
 trihi = LinRange(3,-2,20)
 Trange = 0.5:0.25:3.0
@@ -1097,7 +1094,59 @@ for T in Trange
         lambda_min = .01
     )
 
-    @time sol = SolveFRG(Par, couplings, method = DP5());
+    @time sol = SolveFRG(Par, isotropy, method = DP5());
     chiR = [getChi(sol(t), exp(t), Par) for t in trihi]
     save_object("Tflow/flow$T.jld2", chiR)
+end
+
+######################################################################
+######### SQUARE LATTICE ## SQUARE LATTICE ## SQUARE LATTICE #########
+######################################################################
+
+using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
+using SpinFRGLattices.StaticArrays
+using SpinFRGLattices.SquareLattice
+
+NLen = 5
+J1 = 1
+J2 = 0.1
+couplings = [J1,J2]
+isotropy = [sin(pi/8) * cos(pi/8), sin(pi/8) * sin(pi/8), cos(pi/8)]
+
+System = getSquareLattice(NLen,couplings)
+
+Par = Params(
+    System,
+    T=0.5,
+    N = 8,
+    accuracy = 1e-3,
+    lambda_max = exp(10.),
+    lambda_min = exp(-10.),
+)
+
+@time sol = SolveFRG(Par, isotropy, method = DP5())
+
+## Evaluation Square lattice
+@time begin
+    
+    using PMFRGEvaluation
+    using CairoMakie #for plotting. You can use whatever plotting package you like of course
+
+    System = SquareLattice.getSquareLattice(NLen)
+    Lattice = LatticeInfo(System,SquareLattice)
+    let 
+        chi_R = getChi(sol[end], Par.NumericalParams.lambda_min, Par)
+        
+        chi = getFourier(chi_R, Lattice)
+        
+        k = LinRange(-2pi,2pi,300)
+        
+        chik = [chi(x,y) for x in k, y in k]
+        
+        fig, ax, hm = heatmap(k,k,chik,axis = (;aspect = 1))
+        ax.title = "Square lattice θ=π/8, ϕ=π/8"
+        Colorbar(fig[1,2],hm)
+        display("image/png", fig)
+    end
+
 end
