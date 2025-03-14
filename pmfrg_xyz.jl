@@ -1007,9 +1007,11 @@ struct Observables{ChiType,gammatype}
     gamma::gammatype
 end
 
-getChi(State::ArrayPartition, Lam::Real, Par) = getChi(State.x[2], State.x[3], State.x[5], Lam, Par)
+getChi_z(State::ArrayPartition, Lam::Real, Par) = getChi_z(State.x[2], State.x[3], State.x[5], Lam, Par)
+getChi_x(State::ArrayPartition, Lam::Real, Par) = getChi_x(State.x[3], State.x[4], State.x[5], Lam, Par)
+getChi_y(State::ArrayPartition, Lam::Real, Par) = getChi_y(State.x[4], State.x[2], State.x[5], Lam, Par)
 
-function getChi(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
+function getChi_z(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
 	(;T,N,lenIntw_acc) = Par.NumericalParams
 	(;Npairs,invpairs,PairTypes,OnsitePairs) = Par.System
 
@@ -1031,6 +1033,62 @@ function getChi(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::AbstractA
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGx(xi,nK)^2 * iGy(xj,nK2)^2
 				Chi[Rij] += T^2 * GGGG * Vxy2(Rij,0,npwpw2,w2mw)
+			end
+        end
+    end
+	return(Chi)
+end
+
+function getChi_x(iSigmaY::AbstractArray, iSigmaZ::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
+	(;T,N,lenIntw_acc) = Par.NumericalParams
+	(;Npairs,invpairs,PairTypes,OnsitePairs) = Par.System
+
+	iGy(x,w) = iG_(iSigmaY, x, Lam, w, T)
+    iGz(x,w) = iG_(iSigmaZ, x, Lam, w, T)
+	Vyz2(Rij,s,t,u) = V_(Gamma,s,t,u,Rij,invpairs[Rij],N)[fd_["yz2"]]
+
+	Chi = zeros(_getFloatType(Par),Npairs)
+
+	for Rij in 1:Npairs
+		(;xi,xj) = PairTypes[Rij]
+		for nK in -lenIntw_acc:lenIntw_acc-1
+			if Rij in OnsitePairs
+				Chi[Rij,1] += T * iGy(xi,nK) * iGz(xi, nK)
+			end
+			for nK2 in -lenIntw_acc:lenIntw_acc-1
+				npwpw2 = nK+nK2+1
+				w2mw = nK2-nK
+				#use that Vc_0 is calculated from Vb
+				GGGG = iGy(xi,nK)^2 * iGz(xj,nK2)^2
+				Chi[Rij] += T^2 * GGGG * Vyz2(Rij,0,npwpw2,w2mw)
+			end
+        end
+    end
+	return(Chi)
+end
+
+function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::AbstractArray, Lam::Real, Par)
+	(;T,N,lenIntw_acc) = Par.NumericalParams
+	(;Npairs,invpairs,PairTypes,OnsitePairs) = Par.System
+
+	iGz(x,w) = iG_(iSigmaZ, x, Lam, w, T)
+    iGx(x,w) = iG_(iSigmaX, x, Lam, w, T)
+	Vzx2(Rij,s,t,u) = V_(Gamma,s,t,u,Rij,invpairs[Rij],N)[fd_["zx2"]]
+
+	Chi = zeros(_getFloatType(Par),Npairs)
+
+	for Rij in 1:Npairs
+		(;xi,xj) = PairTypes[Rij]
+		for nK in -lenIntw_acc:lenIntw_acc-1
+			if Rij in OnsitePairs
+				Chi[Rij,1] += T * iGz(xi,nK) * iGx(xi, nK)
+			end
+			for nK2 in -lenIntw_acc:lenIntw_acc-1
+				npwpw2 = nK+nK2+1
+				w2mw = nK2-nK
+				#use that Vc_0 is calculated from Vb
+				GGGG = iGz(xi,nK)^2 * iGx(xj,nK2)^2
+				Chi[Rij] += T^2 * GGGG * Vzx2(Rij,0,npwpw2,w2mw)
 			end
         end
     end
@@ -1062,7 +1120,7 @@ tri = LinRange(3,-2,20)
 
 sol = load_object("dimer_flow_noah.jld2")
 
-chiR = [getChi(s...) for s in sol]
+chiR = [getChi_z(s...) for s in sol]
 chiRY = load_object("yannik_chi.jld2")
 fig = Figure()
 ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
@@ -1076,27 +1134,29 @@ display("image/png", fig)
 ## Dimer against T
 
 System = getPolymer(2)
-isotropy = [0.40824867 * 2.0, 0.40824867, -0.40824867]
+isotropy = [-1.0, -1.0, 1.0]
 
 trihi = LinRange(3,-2,20)
-Trange = 0.5:0.25:3.0
+Trange = exp10.(range(-1, 1, length=20))
+print(Trange)
 
-for T in Trange
-    println("Solving at temperature $T...\n")
+for n in axes(Trange,1)
+    println("Solving $n...\n")
     sleep(2.0)
 
     Par = Params(
         System,
-        T = T,
+        T = Trange[n],
         N = 8,
         accuracy = 1e-5,
         lambda_max = 100.,
-        lambda_min = .01
+        lambda_min = .01,
+        lenIntw_acc = 24
     )
 
     @time sol = SolveFRG(Par, isotropy, method = DP5());
-    chiR = [getChi(sol(t), exp(t), Par) for t in trihi]
-    save_object("Tflow/flow$T.jld2", chiR)
+    sig_z = [sol(t) for t in trihi]
+    save_object("TflowSigma4/flow$n.jld2", sig_z)
 end
 
 ######################################################################
@@ -1135,7 +1195,7 @@ Par = Params(
     System = SquareLattice.getSquareLattice(NLen)
     Lattice = LatticeInfo(System,SquareLattice)
     let 
-        chi_R = getChi(sol[end], Par.NumericalParams.lambda_min, Par)
+        chi_R = getChi_z(sol[end], Par.NumericalParams.lambda_min, Par)
         
         chi = getFourier(chi_R, Lattice)
         

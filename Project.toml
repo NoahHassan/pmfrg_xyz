@@ -1,5 +1,6 @@
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+CurveFit = "5a033b19-8c74-5913-a970-47c3779ef25c"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
