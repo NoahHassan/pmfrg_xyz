@@ -199,3 +199,17 @@ lines!(ax, x, errFunc.(a_y, x), linewidth=2, label=L"1/T^3", color=:black)
 scatter!(ax, Trange, sig_y, marker=:diamond, markersize=10, label=L"iΣ^y_{ex} - iΣ^y", color=:red)
 axislegend(ax, position=:rt)
 display("image/png", fig)
+
+### T flow check ###
+chi, tri = load_object("dimer_chi.jld2")
+### StateType: f_int, iSigma (3 elements), Gamma
+
+isotropy = [0.1, -0.6, 1.0]
+fig = Figure()
+ax = Axis(fig[1,1], title="T-flow [0.1, -0.6, 1.0]")
+scatter!(ax, exp.(tri), getindex.(chi,1))
+scatter!(ax, exp.(tri), getindex.(chi,2))
+lines!(ax, exp.(tri), ChiLocal_z.(exp.(tri), isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label="local")
+lines!(ax, exp.(tri), Chi_z.(exp.(tri), isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label="on site")
+axislegend(ax, position=:rt)
+display("image/png", fig)

@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "e99f2a8d4b2ce304db60e672e24acf054f3c4373"
+project_hash = "3dfd71422222ed02e9d361bddd5466f37959b978"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e1ce448a0d7f88168ffe2eeac4549c32d45a42d1"
@@ -2311,9 +2311,10 @@ weakdeps = ["ChainRulesCore"]
 
 [[deps.SpinFRGLattices]]
 deps = ["StaticArrays", "StructArrays", "Test"]
-git-tree-sha1 = "d700e4c773cb0f5aac2863d3bedf65a5fd971499"
+git-tree-sha1 = "fa58bb703ed9bcf081b1b2f62085045423f04905"
+pinned = true
 uuid = "053fb7f8-31b7-4f68-aef8-4452b415dd8c"
-version = "0.5.2"
+version = "0.5.5"
 
 [[deps.StableRNGs]]
 deps = ["Random"]
