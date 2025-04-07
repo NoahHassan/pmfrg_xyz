@@ -1127,3 +1127,108 @@ ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"T")
 scatterlines!(ax,exp.(tri),getindex.(chiR,1))
 scatterlines!(ax,exp.(tri),getindex.(chiR,2))
 display("image/png", fig)
+
+###################################################################
+######### CUBIC LATTICE ## CUBIC LATTICE ## CUBIC LATTICE #########
+###################################################################
+
+using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
+using SpinFRGLattices.StaticArrays
+using SpinFRGLattices.SimpleCubic
+
+NLen = 4
+J1 = 1
+J2 = 0.5
+couplings = [J1,J2]
+isotropy = [1.0,1.0,1.0]
+
+System = getCubic(NLen,couplings)
+
+Par = Params(
+    System,
+    N = 6,
+    accuracy = 1e-5,
+    temp_max = 100.,
+    temp_min = 1.3
+)
+
+@time sol = SolveFRG(Par, isotropy, method = DP5())
+
+## Evaluation Cubic lattice
+using PMFRGEvaluation
+using CairoMakie
+using LsqFit
+using FRGLatticeEvaluation
+
+Lattice = LatticeInfo(System, SimpleCubic)
+Trange = LinRange(log(1.1), log(100.0), 100)
+xi = []
+for T in Trange
+    chi = getChi_z(sol(T), T, Par)
+    append!(xi, CorrelationLength(chi, [1, -1, 0], Lattice))
+end
+
+fig = Figure()
+ax = Axis(fig[1,1], xlabel=L"T", ylabel=L"\xi")
+scatter!(ax, Trange, xi)
+display("image/png", fig)
+
+# save_object("N8.jld2", [Trange, xi])
+
+# tri = LinRange(log(1.3), log(100.0), 200)
+# flow = [sol(t) for t in tri]
+# save_object("N8_flow_uniform.jld2", flow)
+
+@time begin
+    System = SimpleCubic.getCubic(NLen)
+    Lattice = LatticeInfo(System, SimpleCubic)
+    let 
+        ### important distinction between Λ and T flow:
+        ### The flow parameter is logged in launchPMFRG. Hence
+        ### T=2.0 in Λ flow is T=exp(2.0) in T flow!
+        chi_R1 = getChi_z(sol(log(1.3)), log(1.3), Par)
+        chi_R2 = getChi_z(sol(log(1.5)), log(1.5), Par)
+        chi_R3 = getChi_z(sol(log(2.0)), log(2.0), Par)
+        chi_R4 = getChi_z(sol(log(90.0)), log(90.0), Par)
+
+        chi1 = getNaiveLatticeFT(chi_R1, Lattice)
+        chi2 = getNaiveLatticeFT(chi_R2, Lattice)
+        chi3 = getNaiveLatticeFT(chi_R3, Lattice)
+        chi4 = getNaiveLatticeFT(chi_R4, Lattice)
+        
+        k = LinRange(-2pi,2pi,300)
+        
+        sq2 = 1.0 / sqrt(2)
+        sq6 = 1.0 / sqrt(6)
+        
+        chik1 = [chi1(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
+        chik2 = [chi2(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
+        chik3 = [chi3(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
+        chik4 = [chi4(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
+        
+        println(maximum(chik1))
+        println(maximum(chik2))
+        println(maximum(chik3))
+        println(maximum(chik4))
+        
+        fig = Figure(size=(1200,1300))
+        ax1 = Axis(fig[1,1])
+        ax2 = Axis(fig[1,2])
+        ax3 = Axis(fig[2,1])
+        ax4 = Axis(fig[2,2])
+
+        hm1 = heatmap!(ax1, k, k, chik1)
+        hm2 = heatmap!(ax2, k, k, chik2)
+        hm3 = heatmap!(ax3, k, k, chik3)
+        hm4 = heatmap!(ax4, k, k, chik4)
+
+        Label(fig[0, :], "Cubic Lattice h=[1,1,1], N=4", fontsize=42, tellwidth=false)
+        # Colorbar(fig[1,1],hm1)
+        # Colorbar(fig[1,2],hm1)
+        # Colorbar(fig[2,1],hm3)
+        # Colorbar(fig[2,2],hm4)
+
+        display("image/png", fig)
+    end
+
+end
