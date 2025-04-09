@@ -213,3 +213,20 @@ lines!(ax, exp.(tri), ChiLocal_z.(exp.(tri), isotropy[1], isotropy[2], isotropy[
 lines!(ax, exp.(tri), Chi_z.(exp.(tri), isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label="on site")
 axislegend(ax, position=:rt)
 display("image/png", fig)
+
+### finite size scaling
+d4 = load_object("benchmarks/N4.jld2")
+d5 = load_object("benchmarks/N5.jld2")
+d6 = load_object("benchmarks/N6.jld2")
+d7 = load_object("benchmarks/N7.jld2")
+d8 = load_object("benchmarks/N8.jld2")
+
+fig = Figure()
+ax = Axis(fig[1,1], xlabel=L"T", ylabel=L"\xi")
+scatter!(ax, d4[1], d4[2], label="N = 4")
+scatter!(ax, d5[1], d5[2], label="N = 5")
+scatter!(ax, d6[1], d6[2], label="N = 6")
+scatter!(ax, d7[1], d7[2], label="N = 7")
+scatter!(ax, d8[1], d8[2], label="N = 8")
+axislegend(ax, position=:rt)
+display("image/png", fig)

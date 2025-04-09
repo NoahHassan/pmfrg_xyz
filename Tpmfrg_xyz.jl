@@ -459,14 +459,6 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             + V31[fd_["xy1"]] * V42[fd_["xy1"]] * PT_(1, 2))
         )
 
-        if(Rij == 1 && ns == 7 && nt == 7 && nu == 7)
-            print((V13[fd_["xy3"]] * V24[fd_["xy3"]] * P_(2, 1)
-            + V13[fd_["xy1"]] * V24[fd_["xy1"]] * P_(1, 2))
-
-            + (V31[fd_["xy3"]] * V42[fd_["xy3"]] * PT_(2, 1)
-            + V31[fd_["xy1"]] * V42[fd_["xy1"]] * PT_(1, 2)))
-        end
-
         X_sum[21 + fd_["xz1"], Rij, is, it, iu] += (
             (V13[fd_["xz3"]] * V24[fd_["xz3"]] * P_(3, 1)
             + V13[fd_["xz1"]] * V24[fd_["xz1"]] * P_(1, 3))
@@ -864,22 +856,11 @@ function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
-    println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
-
-    println("======== get_Self_Energy =========")
     get_Self_Energy!(Workspace, Lam)
-
-    println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
-    
-    println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
-
-    println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
-
-    println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
 
     return
@@ -893,10 +874,11 @@ t_to_Lam(t) = exp(t)
 Lam_to_t(t) = log(t)
 
 function AllocateSetup(Par::OneLoopParams_1)
-    println("Allocate Setup")
+    print("Allocate Setup: ")
     ## Allocate Memory:
     floattype = _getFloatType(Par)
     X = zeros(floattype, getBubbleVDims(Par))
+    println("$(sizeof(X) / 1000000.0) MB of memory")
     return (X,Par)
 end
 
@@ -1095,39 +1077,6 @@ function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::Abstrac
 	return(Chi)
 end
 
-##########################################################
-######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
-##########################################################
-
-System = getPolymer(2)
-isotropy = [0.1, -0.6, 1.0]
-
-Par = Params(
-    System,
-    N = 8,
-    accuracy = 1e-5,
-    temp_max = 1000.,
-    temp_min = 1.0
-)
-##
-@time testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!, loadArgs = false)
-
-tri = LinRange(4,1.0,20) ### is actually the log of the time simulated (see Lam_to_t in launchPMFRG)
-
-@time sol = SolveFRG(Par, isotropy, method = DP5());
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
-
-sol_ = load_object("dimer_flow_noah.jld2")
-
-chiR = [getChi_z(s...) for s in sol_]
-save_object("dimer_chi.jld2", [chiR, tri])
-
-fig = Figure()
-ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"T")
-scatterlines!(ax,exp.(tri),getindex.(chiR,1))
-scatterlines!(ax,exp.(tri),getindex.(chiR,2))
-display("image/png", fig)
-
 ###################################################################
 ######### CUBIC LATTICE ## CUBIC LATTICE ## CUBIC LATTICE #########
 ###################################################################
@@ -1136,7 +1085,7 @@ using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructA
 using SpinFRGLattices.StaticArrays
 using SpinFRGLattices.SimpleCubic
 
-NLen = 4
+NLen = 8
 J1 = 1
 J2 = 0.5
 couplings = [J1,J2]
@@ -1146,7 +1095,7 @@ System = getCubic(NLen,couplings)
 
 Par = Params(
     System,
-    N = 6,
+    N = 16,
     accuracy = 1e-5,
     temp_max = 100.,
     temp_min = 1.3
@@ -1157,7 +1106,6 @@ Par = Params(
 ## Evaluation Cubic lattice
 using PMFRGEvaluation
 using CairoMakie
-using LsqFit
 using FRGLatticeEvaluation
 
 Lattice = LatticeInfo(System, SimpleCubic)
@@ -1168,67 +1116,7 @@ for T in Trange
     append!(xi, CorrelationLength(chi, [1, -1, 0], Lattice))
 end
 
-fig = Figure()
-ax = Axis(fig[1,1], xlabel=L"T", ylabel=L"\xi")
-scatter!(ax, Trange, xi)
-display("image/png", fig)
+save_object("correlation_N$NLen.jld2", [Trange, xi])
 
-# save_object("N8.jld2", [Trange, xi])
-
-# tri = LinRange(log(1.3), log(100.0), 200)
-# flow = [sol(t) for t in tri]
-# save_object("N8_flow_uniform.jld2", flow)
-
-@time begin
-    System = SimpleCubic.getCubic(NLen)
-    Lattice = LatticeInfo(System, SimpleCubic)
-    let 
-        ### important distinction between Λ and T flow:
-        ### The flow parameter is logged in launchPMFRG. Hence
-        ### T=2.0 in Λ flow is T=exp(2.0) in T flow!
-        chi_R1 = getChi_z(sol(log(1.3)), log(1.3), Par)
-        chi_R2 = getChi_z(sol(log(1.5)), log(1.5), Par)
-        chi_R3 = getChi_z(sol(log(2.0)), log(2.0), Par)
-        chi_R4 = getChi_z(sol(log(90.0)), log(90.0), Par)
-
-        chi1 = getNaiveLatticeFT(chi_R1, Lattice)
-        chi2 = getNaiveLatticeFT(chi_R2, Lattice)
-        chi3 = getNaiveLatticeFT(chi_R3, Lattice)
-        chi4 = getNaiveLatticeFT(chi_R4, Lattice)
-        
-        k = LinRange(-2pi,2pi,300)
-        
-        sq2 = 1.0 / sqrt(2)
-        sq6 = 1.0 / sqrt(6)
-        
-        chik1 = [chi1(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
-        chik2 = [chi2(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
-        chik3 = [chi3(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
-        chik4 = [chi4(x*sq2 + y*sq6, -x*sq2 + y*sq6, -2*y*sq6) for x in k, y in k]
-        
-        println(maximum(chik1))
-        println(maximum(chik2))
-        println(maximum(chik3))
-        println(maximum(chik4))
-        
-        fig = Figure(size=(1200,1300))
-        ax1 = Axis(fig[1,1])
-        ax2 = Axis(fig[1,2])
-        ax3 = Axis(fig[2,1])
-        ax4 = Axis(fig[2,2])
-
-        hm1 = heatmap!(ax1, k, k, chik1)
-        hm2 = heatmap!(ax2, k, k, chik2)
-        hm3 = heatmap!(ax3, k, k, chik3)
-        hm4 = heatmap!(ax4, k, k, chik4)
-
-        Label(fig[0, :], "Cubic Lattice h=[1,1,1], N=4", fontsize=42, tellwidth=false)
-        # Colorbar(fig[1,1],hm1)
-        # Colorbar(fig[1,2],hm1)
-        # Colorbar(fig[2,1],hm3)
-        # Colorbar(fig[2,2],hm4)
-
-        display("image/png", fig)
-    end
-
-end
+flow = [Trange, [sol(t) for t in Trange]]
+save_object("N$(NLen)_flow_uniform.jld2", flow)
