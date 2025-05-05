@@ -1,14 +1,13 @@
-#################################################
-######### STRUCTS ## STRUCTS ## STRUCTS #########
-#################################################
-import Pkg;
-Pkg.activate(".")
+module pmfrg_xyz
 
 using JLD2
 using RecursiveArrayTools
 using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
 using SpinFRGLattices.StaticArrays
-using CairoMakie
+
+#################################################
+######### STRUCTS ## STRUCTS ## STRUCTS #########
+#################################################
 
 setZero!(a::AbstractArray{T,N}) where {T,N} = fill!(a,zero(T))
 
@@ -257,7 +256,6 @@ function V_(Vertex::AbstractArray, ns::Int, nt::Int, nu::Int, Rij::Integer, Rji:
 
     ### Compute the matrices, lets say M is found
     ### Then return M * Vertex[:, Rij, ns + 1, nt + 1, nu + 1]
-
 
     FlavorTransform = Matrix{Float64}(I, 21, 21)
 
@@ -864,22 +862,11 @@ function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
-    println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
-
-    println("======== get_Self_Energy =========")
     get_Self_Energy!(Workspace, Lam)
-
-    println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
-    
-    println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
-
-    println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
-
-    println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
 
     return
@@ -1095,118 +1082,6 @@ function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::Abstrac
 	return(Chi)
 end
 
-##########################################################
-######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
-##########################################################
-
-System = getPolymer(2)
-isotropy = [1.0, 0.6, 0.3]
-
-Par = Params(
-    System,
-    T = 0.5,
-    N = 8,
-    accuracy = 1e-5,
-    lambda_max = 100.,
-    lambda_min = .01
-)
-##
-@time testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!, loadArgs = false)
-
-@time sol = SolveFRG(Par, isotropy, method = DP5());
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
-
-tri = LinRange(3,-2,20)
-
-sol = load_object("dimer_flow_noah.jld2")
-
-chiR = [getChi_z(s...) for s in sol]
-chiRY = load_object("yannik_chi.jld2")
-fig = Figure()
-ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
-
-scatterlines!(ax,exp.(tri),getindex.(chiR,1))
-scatterlines!(ax,exp.(tri),getindex.(chiR,2))
-scatterlines!(ax,exp.(tri),getindex.(chiRY,1))
-scatterlines!(ax,exp.(tri),getindex.(chiRY,2))
-display("image/png", fig)
-
-## Dimer against T
-
-System = getPolymer(2)
-isotropy = [-1.0, -1.0, 1.0]
-
-trihi = LinRange(3,-2,20)
-Trange = exp10.(range(-1, 1, length=20))
-print(Trange)
-
-for n in axes(Trange,1)
-    println("Solving $n...\n")
-    sleep(2.0)
-
-    Par = Params(
-        System,
-        T = Trange[n],
-        N = 8,
-        accuracy = 1e-5,
-        lambda_max = 100.,
-        lambda_min = .01,
-        lenIntw_acc = 24
-    )
-
-    @time sol = SolveFRG(Par, isotropy, method = DP5());
-    sig_z = [sol(t) for t in trihi]
-    save_object("TflowSigma4/flow$n.jld2", sig_z)
-end
-
-######################################################################
-######### SQUARE LATTICE ## SQUARE LATTICE ## SQUARE LATTICE #########
-######################################################################
-
-using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
-using SpinFRGLattices.StaticArrays
-using SpinFRGLattices.SquareLattice
-
-NLen = 5
-J1 = 1
-J2 = 0.1
-couplings = [J1,J2]
-isotropy = [sin(pi/8) * cos(pi/8), sin(pi/8) * sin(pi/8), cos(pi/8)]
-
-System = getSquareLattice(NLen,couplings)
-
-Par = Params(
-    System,
-    T=0.5,
-    N = 8,
-    accuracy = 1e-3,
-    lambda_max = exp(10.),
-    lambda_min = exp(-10.),
-)
-
-@time sol = SolveFRG(Par, isotropy, method = DP5())
-
-## Evaluation Square lattice
-@time begin
-    
-    using PMFRGEvaluation
-    using CairoMakie #for plotting. You can use whatever plotting package you like of course
-
-    System = SquareLattice.getSquareLattice(NLen)
-    Lattice = LatticeInfo(System,SquareLattice)
-    let 
-        chi_R = getChi_z(sol[end], Par.NumericalParams.lambda_min, Par)
-        
-        chi = getFourier(chi_R, Lattice)
-        
-        k = LinRange(-2pi,2pi,300)
-        
-        chik = [chi(x,y) for x in k, y in k]
-        
-        fig, ax, hm = heatmap(k,k,chik,axis = (;aspect = 1))
-        ax.title = "Square lattice θ=π/8, ϕ=π/8"
-        Colorbar(fig[1,2],hm)
-        display("image/png", fig)
-    end
+export Params, SolveFRG, getChi_x, getChi_y, getChi_z
 
 end

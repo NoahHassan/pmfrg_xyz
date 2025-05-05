@@ -1,14 +1,12 @@
+module Tpmfrg_xyz
+
 #################################################
 ######### STRUCTS ## STRUCTS ## STRUCTS #########
 #################################################
-import Pkg;
-Pkg.activate(".")
 
-using JLD2
 using RecursiveArrayTools
 using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
 using SpinFRGLattices.StaticArrays
-using CairoMakie
 
 setZero!(a::AbstractArray{T,N}) where {T,N} = fill!(a,zero(T))
 
@@ -141,24 +139,22 @@ function iSigma_(iSigma::AbstractArray, x::Integer, nw::Integer)
     return s * iSigma[x, iw]
 end
 
-### original paper has G-1 ~ beta, which was divided out of the original code
-### in T-flow, G-1 ~ 1/sqrt(T), so dividing by beta gives G-1 ~ sqrt(T)
 function iG_(iSigma::AbstractArray, x::Integer, nw::Integer, T::Real)
     w = get_w(nw,T)
-    return 1.0 / ((w + iSigma_(iSigma, x, nw)) * sqrt(T)) ### because original code multiplied by beta
+    return 1.0 / (w * sqrt(T) + iSigma_(iSigma, x, nw))
 end
 
 ### by differentiating the above inverse by T
 function iS_(iSigma::AbstractArray, x::Integer, nw::Integer, T::Real)
     w = get_w(nw, T)
-    return -iG_(iSigma, x, nw, T)^2 * 1.0 / (2.0 * sqrt(T))
+    return -iG_(iSigma, x, nw, T)^2 * w / (2.0 * sqrt(T))
 end
 
 ### Katanin requires (d/dΛ)iΣ, which in the original code is iSigma_(DSigma, x, nw)
 ### might be wrong here though.
 function iSKat_(iSigma::AbstractArray, DSigma::AbstractArray, x::Integer, nw::Integer, T::Real)
     w = get_w(nw, T)
-    return -iG_(iSigma, x, nw, T)^2 * (1.0 / (2.0 * sqrt(T)) + iSigma_(DSigma, x, nw))
+    return -iG_(iSigma, x, nw, T)^2 * (w / (2.0 * sqrt(T)) + iSigma_(DSigma, x, nw))
 end
 
 ####################################################
@@ -864,22 +860,11 @@ function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
-    println("\n============ getDFint ============")
     getDFint!(Workspace, Lam)
-
-    println("======== get_Self_Energy =========")
     get_Self_Energy!(Workspace, Lam)
-
-    println("=========== getXBubble ===========")
     getXBubble!(Workspace, Lam)
-    
-    println("======== symmetrizeBubble ========")
     symmetrizeBubble!(Workspace.X, Par)
-
-    println("===== addToVertexFromBubble ======")
     addToVertexFromBubble!(Workspace.Deriv.Gamma, Workspace.X)
-
-    println("======== symmetrizeVertex ========\n")
     symmetrizeVertex!(Workspace.Deriv.Gamma, Par)
 
     return
@@ -1095,35 +1080,6 @@ function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::Abstrac
 	return(Chi)
 end
 
-##########################################################
-######### DIMER SUSC ## DIMER SUSC ## DIMER SUSC #########
-##########################################################
+export Params, SolveFRG, getChi_x, getChi_y, getChi_z
 
-System = getPolymer(2)
-isotropy = [0.1, -0.6, 1.0]
-
-Par = Params(
-    System,
-    N = 8,
-    accuracy = 1e-5,
-    temp_max = 1000.,
-    temp_min = 1.0
-)
-##
-@time testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!, loadArgs = false)
-
-tri = LinRange(4,1.0,20) ### is actually the log of the time simulated (see Lam_to_t in launchPMFRG)
-
-@time sol = SolveFRG(Par, isotropy, method = DP5());
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
-
-sol_ = load_object("dimer_flow_noah.jld2")
-
-chiR = [getChi_z(s...) for s in sol_]
-save_object("dimer_chi.jld2", [chiR, tri])
-
-fig = Figure()
-ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"T")
-scatterlines!(ax,exp.(tri),getindex.(chiR,1))
-scatterlines!(ax,exp.(tri),getindex.(chiR,2))
-display("image/png", fig)
+end
