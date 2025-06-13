@@ -36,6 +36,12 @@ struct StateType{T}
     Gamma::Array{T, 5}
 end
 
+struct Observables{T}
+    Chi_x::Vector{T}
+    Chi_y::Vector{T}
+    Chi_z::Vector{T}
+end
+
 struct NumericalParams{T<:Real}
     N::Int
 
@@ -918,9 +924,30 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     tend = get_t_min(temp_min)
     Deriv_subst! = generateSubstituteDeriv(Deriv!)
 
+    saved_values = SavedValues(eltype(State), Observables{eltype(State)})
+
+    function save_func(State, t, integrator)
+        chi_x = getChi_x(State, t_to_Lam(t), Par)
+        chi_y = getChi_y(State, t_to_Lam(t), Par)
+        chi_z = getChi_z(State, t_to_Lam(t), Par)
+
+        return Observables(copy(chi_x), copy(chi_y), copy(chi_z))
+    end
+
+    saveCB = SavingCallback(save_func, saved_values, save_everystep=true, tdir=-1)
+
     problem = ODEProblem(Deriv_subst!, State, (t0, tend), setup) # function, initial state, timespan, ??
-    sol = solve(problem, method, reltol = accuracy, abstol = accuracy, save_everystep = true, dt=Lam_to_t(0.2 * temp_max))
-    return sol
+    sol = solve(
+        problem,
+        method,
+        reltol = accuracy,
+        abstol = accuracy,
+        save_everystep = false,
+        callback = saveCB,
+        dt=Lam_to_t(0.2 * temp_max)
+    )
+
+    return sol, saved_values
 end
 
 function testPMFRG!(State, setup, Deriv!::Function; loadArgs = false)
@@ -987,11 +1014,6 @@ end
 ######### OBSERVABLES ## OBSERVABLES ## OBSERVABLES #########
 #############################################################
 
-struct Observables{ChiType,gammatype}
-    Chi::ChiType
-    gamma::gammatype
-end
-
 getChi_z(State::ArrayPartition, T::Real, Par) = getChi_z(State.x[2], State.x[3], State.x[5], T, Par)
 getChi_x(State::ArrayPartition, T::Real, Par) = getChi_x(State.x[3], State.x[4], State.x[5], T, Par)
 getChi_y(State::ArrayPartition, T::Real, Par) = getChi_y(State.x[4], State.x[2], State.x[5], T, Par)
@@ -1017,7 +1039,7 @@ function getChi_z(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGx(xi,nK)^2 * iGy(xj,nK2)^2
-				Chi[Rij] += GGGG * Vxy2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += GGGG * Vxy2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
@@ -1045,7 +1067,7 @@ function getChi_x(iSigmaY::AbstractArray, iSigmaZ::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGy(xi,nK)^2 * iGz(xj,nK2)^2
-				Chi[Rij] += GGGG * Vyz2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += GGGG * Vyz2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
@@ -1073,7 +1095,7 @@ function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGz(xi,nK)^2 * iGx(xj,nK2)^2
-				Chi[Rij] += GGGG * Vzx2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += GGGG * Vzx2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
