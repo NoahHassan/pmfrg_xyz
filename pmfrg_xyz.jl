@@ -1019,7 +1019,7 @@ function getChi_z(iSigmaX::AbstractArray, iSigmaY::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGx(xi,nK)^2 * iGy(xj,nK2)^2
-				Chi[Rij] += T^2 * GGGG * Vxy2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += T^2 * GGGG * Vxy2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
@@ -1047,7 +1047,7 @@ function getChi_x(iSigmaY::AbstractArray, iSigmaZ::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGy(xi,nK)^2 * iGz(xj,nK2)^2
-				Chi[Rij] += T^2 * GGGG * Vyz2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += T^2 * GGGG * Vyz2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
@@ -1075,7 +1075,7 @@ function getChi_y(iSigmaZ::AbstractArray, iSigmaX::AbstractArray, Gamma::Abstrac
 				w2mw = nK2-nK
 				#use that Vc_0 is calculated from Vb
 				GGGG = iGz(xi,nK)^2 * iGx(xj,nK2)^2
-				Chi[Rij] += T^2 * GGGG * Vzx2(Rij,0,npwpw2,w2mw)
+				Chi[Rij] += T^2 * GGGG * Vzx2(Rij,0,npwpw2,-w2mw)
 			end
         end
     end
