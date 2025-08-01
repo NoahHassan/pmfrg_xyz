@@ -785,7 +785,6 @@ using JLD2
 function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
 
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
-
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
 
     getDFint!(Workspace, Lam)
@@ -835,8 +834,15 @@ function InitializeState(Par, isotropy)
 
 end
 
+function gettMesh(T_min, T_max, npoints)
+    t_min = get_t_min(T_min)
+    t_max = Lam_to_t(T_max)
+    return LinRange(t_min, t_max, npoints)
+end
+
 function launchPMFRG!(State, setup, Deriv!::Function;
-    method = DP5()
+    method = DP5(),
+    npoints = 600
     )
 
     Par = setup[end]
@@ -856,7 +862,8 @@ function launchPMFRG!(State, setup, Deriv!::Function;
         return Observables(copy(chi_x), copy(chi_y), copy(chi_z))
     end
 
-    saveCB = SavingCallback(save_func, saved_values, save_everystep=true, tdir=-1)
+    ObsSaveat = gettMesh(temp_min, temp_max, npoints)
+    saveCB = SavingCallback(save_func, saved_values, save_everystep=false, saveat=ObsSaveat, tdir=-1)
 
     problem = ODEProblem(Deriv_subst!, State, (t0, tend), setup) # function, initial state, timespan, ??
     sol = solve(
@@ -915,19 +922,19 @@ end
 
 function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector, isotropy::Array{T}) where T
     for Rj in axes(Gamma,2)
-        Gamma[fd.yz2, Rj, :, :, :] .= -couplings[Rj] * isotropy[1]
-        Gamma[fd.zy2, Rj, :, :, :] .= -couplings[Rj] * isotropy[1]
-        Gamma[fd.zx2, Rj, :, :, :] .= -couplings[Rj] * isotropy[2]
-        Gamma[fd.xz2, Rj, :, :, :] .= -couplings[Rj] * isotropy[2]
-        Gamma[fd.xy2, Rj, :, :, :] .= -couplings[Rj] * isotropy[3]
-        Gamma[fd.yx2, Rj, :, :, :] .= -couplings[Rj] * isotropy[3]
+        Gamma[fd.yz2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,1]
+        Gamma[fd.zy2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,1]
+        Gamma[fd.zx2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,2]
+        Gamma[fd.xz2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,2]
+        Gamma[fd.xy2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,3]
+        Gamma[fd.yx2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,3]
 
-        Gamma[fd.yz3, Rj, :, :, :] .= couplings[Rj] * isotropy[1]
-        Gamma[fd.zy3, Rj, :, :, :] .= couplings[Rj] * isotropy[1]
-        Gamma[fd.zx3, Rj, :, :, :] .= couplings[Rj] * isotropy[2]
-        Gamma[fd.xz3, Rj, :, :, :] .= couplings[Rj] * isotropy[2]
-        Gamma[fd.xy3, Rj, :, :, :] .= couplings[Rj] * isotropy[3]
-        Gamma[fd.yx3, Rj, :, :, :] .= couplings[Rj] * isotropy[3]
+        Gamma[fd.yz3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,1]
+        Gamma[fd.zy3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,1]
+        Gamma[fd.zx3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,2]
+        Gamma[fd.xz3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,2]
+        Gamma[fd.xy3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,3]
+        Gamma[fd.yx3, Rj, :, :, :] .= couplings[Rj] * isotropy[Rj,3]
     end
 
     return Gamma
