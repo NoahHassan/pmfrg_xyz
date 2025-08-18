@@ -1,8 +1,8 @@
 using Pkg
 Pkg.activate(".")
-include("pmfrg_xyz.jl")
 
-using .pmfrg_xyz
+include("Tpmfrg_xyz.jl")
+using .Tpmfrg_xyz
 
 using JLD2
 using RecursiveArrayTools
@@ -11,55 +11,58 @@ using SpinFRGLattices.StaticArrays
 using CairoMakie
 
 System = getPolymer(2)
-isotropy = [1.0, 0.6, 0.3]
+isotropy = zeros(System.Npairs, 3)
+for n in System.Npairs
+    isotropy[n, :] = [0.4, 0.0, 1.0] # [0.0, 1.0, 0.0]
+end
 
-Par = Params(
-    System,
-    T = 0.5,
-    N = 8,
-    accuracy = 1e-5,
-    lambda_max = 100.,
-    lambda_min = .01
-)
-
-@time sol = SolveFRG(Par, isotropy, method = DP5());
-tri = LinRange(3,-2,20)
-save_object("dimer_flow_noah.jld2", [(sol(t), exp(t), Par) for t in tri])
-
-sol = load_object("dimer_flow_noah.jld2")
-
-chiR = [getChi_z(s...) for s in sol]
-fig = Figure()
-ax = Axis(fig[1,1], ylabel = L"χ",xlabel = L"Λ")
-
-scatterlines!(ax,exp.(tri),getindex.(chiR,1))
-scatterlines!(ax,exp.(tri),getindex.(chiR,2))
-display("image/png", fig)
-
-## Dimer against T
-
-System = getPolymer(2)
-isotropy = [-1.0, -1.0, 1.0]
-
-trihi = LinRange(3,-2,20)
-Trange = exp10.(range(-1, 1, length=20))
-print(Trange)
-
-for n in axes(Trange,1)
-    println("Solving $n...\n")
-    sleep(2.0)
-
-    Par = Params(
+let
+    Par = Tpmfrg_xyz.Params(
         System,
-        T = Trange[n],
         N = 8,
-        accuracy = 1e-5,
-        lambda_max = 100.,
-        lambda_min = .01,
-        lenIntw_acc = 24
+        accuracy = 1e-10,
+        temp_max = 100.,
+        temp_min = 1.0
     )
 
-    @time sol = SolveFRG(Par, isotropy, method = DP5());
-    sig_z = [sol(t) for t in trihi]
-    save_object("TflowSigma4/flow$n.jld2", sig_z)
+    sol, saved_values = Tpmfrg_xyz.SolveFRG(Par, isotropy, method = Euler());
+    save_object("ChiDimer.jld2", [(saved_values.saveval[n], exp(saved_values.t[n])) for n in 1:length(saved_values.t)])
 end
+
+function CompareArrays(arr1, arr2)
+    mismatches = [Tuple(I) for I in CartesianIndices(arr1) if arr1[I] != arr2[I]]
+    for n in 1:length(mismatches)
+        println(mismatches[n])
+    end
+end
+
+g1_before = load_object("tests_1/X_1.jld2")
+g1_after  = load_object("tests_1/X_after_1.jld2")
+g2_before = load_object("tests_2/X_1.jld2")
+g2_after  = load_object("tests_2/X_after_1.jld2")
+
+### Test iSigma
+sig1_before = g1_before[1].iSigma
+sig1_after  = g1_after[1].iSigma
+sig2_before = g2_before[1].iSigma
+sig2_after  = g2_after[1].iSigma
+
+CompareArrays(sig1_after.x, sig2_before.x)
+CompareArrays(sig1_after.y, sig2_before.y)
+CompareArrays(sig1_after.z, sig2_before.z)
+
+### Test Gamma
+gam1_before = g1_before[1].Gamma
+gam1_after  = g1_after[1].Gamma
+gam2_before = g2_before[1].Gamma
+gam2_after  = g2_after[1].Gamma
+
+CompareArrays(gam1_after, gam2_before)
+
+### Test X
+X1_before = g1_before[2]
+X1_after  = g1_after[2]
+X2_before = g2_before[2]
+X2_after  = g2_after[2]
+
+CompareArrays(X1_after, X2_before)

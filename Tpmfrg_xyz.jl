@@ -42,7 +42,7 @@ struct Observables{T}
     Chi_z::Vector{T}
 end
 
-struct NumericalParams{T<:Real}
+mutable struct NumericalParams{T<:Real}
     N::Int
 
     accuracy::T
@@ -51,6 +51,8 @@ struct NumericalParams{T<:Real}
 
     lenIntw::Int
     lenIntw_acc::Int
+
+    isTransformed::Int
 end
 
 struct OptionParams
@@ -108,7 +110,9 @@ function NumericalParams(;
         temp_max,
 
         lenIntw,
-        lenIntw_acc
+        lenIntw_acc,
+
+        0
     )
 end
 
@@ -232,16 +236,148 @@ module fd
     const zy1 = 9
     const xy2 = 10
     const xz2 = 11
-    const yx2 = 12
-    const yz2 = 13
+    const yz2 = 12
+    const yx2 = 13
     const zx2 = 14
     const zy2 = 15
     const xy3 = 16
     const xz3 = 17
-    const yx3 = 18
-    const yz3 = 19
+    const yz3 = 18
+    const yx3 = 19
     const zx3 = 20
     const zy3 = 21
+end
+
+function TransformXYZ!(Workspace)
+    (; State, Deriv, X, Par) = Workspace
+    StateCopy = deepcopy(State)
+    DerivCopy = deepcopy(Deriv)
+    XCopy = deepcopy(X)
+
+    # println(State.Gamma[fd.yz2, 2, 1, 1, 1])
+
+    for Rj in axes(State.Gamma, 2)
+        StateCopy.Gamma[fd.xx, Rj, :, :, :] .= State.Gamma[fd.yy, Rj, :, :, :]
+        StateCopy.Gamma[fd.yy, Rj, :, :, :] .= State.Gamma[fd.zz, Rj, :, :, :]
+        StateCopy.Gamma[fd.zz, Rj, :, :, :] .= State.Gamma[fd.xx, Rj, :, :, :]
+
+        StateCopy.Gamma[fd.xy1, Rj, :, :, :] .= State.Gamma[fd.yz1, Rj, :, :, :]
+        StateCopy.Gamma[fd.xz1, Rj, :, :, :] .= State.Gamma[fd.yx1, Rj, :, :, :]
+        StateCopy.Gamma[fd.yz1, Rj, :, :, :] .= State.Gamma[fd.zx1, Rj, :, :, :]
+        StateCopy.Gamma[fd.yx1, Rj, :, :, :] .= State.Gamma[fd.zy1, Rj, :, :, :]
+        StateCopy.Gamma[fd.zx1, Rj, :, :, :] .= State.Gamma[fd.xy1, Rj, :, :, :]
+        StateCopy.Gamma[fd.zy1, Rj, :, :, :] .= State.Gamma[fd.xz1, Rj, :, :, :]
+        
+        StateCopy.Gamma[fd.xy2, Rj, :, :, :] .= State.Gamma[fd.yz2, Rj, :, :, :]
+        StateCopy.Gamma[fd.xz2, Rj, :, :, :] .= State.Gamma[fd.yx2, Rj, :, :, :]
+        StateCopy.Gamma[fd.yz2, Rj, :, :, :] .= State.Gamma[fd.zx2, Rj, :, :, :]
+        StateCopy.Gamma[fd.yx2, Rj, :, :, :] .= State.Gamma[fd.zy2, Rj, :, :, :]
+        StateCopy.Gamma[fd.zx2, Rj, :, :, :] .= State.Gamma[fd.xy2, Rj, :, :, :]
+        StateCopy.Gamma[fd.zy2, Rj, :, :, :] .= State.Gamma[fd.xz2, Rj, :, :, :]
+        
+        StateCopy.Gamma[fd.xy3, Rj, :, :, :] .= State.Gamma[fd.yz3, Rj, :, :, :]
+        StateCopy.Gamma[fd.xz3, Rj, :, :, :] .= State.Gamma[fd.yx3, Rj, :, :, :]
+        StateCopy.Gamma[fd.yz3, Rj, :, :, :] .= State.Gamma[fd.zx3, Rj, :, :, :]
+        StateCopy.Gamma[fd.yx3, Rj, :, :, :] .= State.Gamma[fd.zy3, Rj, :, :, :]
+        StateCopy.Gamma[fd.zx3, Rj, :, :, :] .= State.Gamma[fd.xy3, Rj, :, :, :]
+        StateCopy.Gamma[fd.zy3, Rj, :, :, :] .= State.Gamma[fd.xz3, Rj, :, :, :]
+
+        DerivCopy.Gamma[fd.xx, Rj, :, :, :] .= Deriv.Gamma[fd.yy, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yy, Rj, :, :, :] .= Deriv.Gamma[fd.zz, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zz, Rj, :, :, :] .= Deriv.Gamma[fd.xx, Rj, :, :, :]
+
+        DerivCopy.Gamma[fd.xy1, Rj, :, :, :] .= Deriv.Gamma[fd.yz1, Rj, :, :, :]
+        DerivCopy.Gamma[fd.xz1, Rj, :, :, :] .= Deriv.Gamma[fd.yx1, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yz1, Rj, :, :, :] .= Deriv.Gamma[fd.zx1, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yx1, Rj, :, :, :] .= Deriv.Gamma[fd.zy1, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zx1, Rj, :, :, :] .= Deriv.Gamma[fd.xy1, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zy1, Rj, :, :, :] .= Deriv.Gamma[fd.xz1, Rj, :, :, :]
+        
+        DerivCopy.Gamma[fd.xy2, Rj, :, :, :] .= Deriv.Gamma[fd.yz2, Rj, :, :, :]
+        DerivCopy.Gamma[fd.xz2, Rj, :, :, :] .= Deriv.Gamma[fd.yx2, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yz2, Rj, :, :, :] .= Deriv.Gamma[fd.zx2, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yx2, Rj, :, :, :] .= Deriv.Gamma[fd.zy2, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zx2, Rj, :, :, :] .= Deriv.Gamma[fd.xy2, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zy2, Rj, :, :, :] .= Deriv.Gamma[fd.xz2, Rj, :, :, :]
+        
+        DerivCopy.Gamma[fd.xy3, Rj, :, :, :] .= Deriv.Gamma[fd.yz3, Rj, :, :, :]
+        DerivCopy.Gamma[fd.xz3, Rj, :, :, :] .= Deriv.Gamma[fd.yx3, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yz3, Rj, :, :, :] .= Deriv.Gamma[fd.zx3, Rj, :, :, :]
+        DerivCopy.Gamma[fd.yx3, Rj, :, :, :] .= Deriv.Gamma[fd.zy3, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zx3, Rj, :, :, :] .= Deriv.Gamma[fd.xy3, Rj, :, :, :]
+        DerivCopy.Gamma[fd.zy3, Rj, :, :, :] .= Deriv.Gamma[fd.xz3, Rj, :, :, :]
+
+        XCopy[fd.xx, Rj, :, :, :] .= X[fd.yy, Rj, :, :, :]
+        XCopy[fd.yy, Rj, :, :, :] .= X[fd.zz, Rj, :, :, :]
+        XCopy[fd.zz, Rj, :, :, :] .= X[fd.xx, Rj, :, :, :]
+
+        XCopy[fd.xy1, Rj, :, :, :] .= X[fd.yz1, Rj, :, :, :]
+        XCopy[fd.xz1, Rj, :, :, :] .= X[fd.yx1, Rj, :, :, :]
+        XCopy[fd.yz1, Rj, :, :, :] .= X[fd.zx1, Rj, :, :, :]
+        XCopy[fd.yx1, Rj, :, :, :] .= X[fd.zy1, Rj, :, :, :]
+        XCopy[fd.zx1, Rj, :, :, :] .= X[fd.xy1, Rj, :, :, :]
+        XCopy[fd.zy1, Rj, :, :, :] .= X[fd.xz1, Rj, :, :, :]
+        
+        XCopy[fd.xy2, Rj, :, :, :] .= X[fd.yz2, Rj, :, :, :]
+        XCopy[fd.xz2, Rj, :, :, :] .= X[fd.yx2, Rj, :, :, :]
+        XCopy[fd.yz2, Rj, :, :, :] .= X[fd.zx2, Rj, :, :, :]
+        XCopy[fd.yx2, Rj, :, :, :] .= X[fd.zy2, Rj, :, :, :]
+        XCopy[fd.zx2, Rj, :, :, :] .= X[fd.xy2, Rj, :, :, :]
+        XCopy[fd.zy2, Rj, :, :, :] .= X[fd.xz2, Rj, :, :, :]
+        
+        XCopy[fd.xy3, Rj, :, :, :] .= X[fd.yz3, Rj, :, :, :]
+        XCopy[fd.xz3, Rj, :, :, :] .= X[fd.yx3, Rj, :, :, :]
+        XCopy[fd.yz3, Rj, :, :, :] .= X[fd.zx3, Rj, :, :, :]
+        XCopy[fd.yx3, Rj, :, :, :] .= X[fd.zy3, Rj, :, :, :]
+        XCopy[fd.zx3, Rj, :, :, :] .= X[fd.xy3, Rj, :, :, :]
+        XCopy[fd.zy3, Rj, :, :, :] .= X[fd.xz3, Rj, :, :, :]
+
+        XCopy[21 + fd.xx, Rj, :, :, :] .= X[21 + fd.yy, Rj, :, :, :]
+        XCopy[21 + fd.yy, Rj, :, :, :] .= X[21 + fd.zz, Rj, :, :, :]
+        XCopy[21 + fd.zz, Rj, :, :, :] .= X[21 + fd.xx, Rj, :, :, :]
+
+        XCopy[21 + fd.xy1, Rj, :, :, :] .= X[21 + fd.yz1, Rj, :, :, :]
+        XCopy[21 + fd.xz1, Rj, :, :, :] .= X[21 + fd.yx1, Rj, :, :, :]
+        XCopy[21 + fd.yz1, Rj, :, :, :] .= X[21 + fd.zx1, Rj, :, :, :]
+        XCopy[21 + fd.yx1, Rj, :, :, :] .= X[21 + fd.zy1, Rj, :, :, :]
+        XCopy[21 + fd.zx1, Rj, :, :, :] .= X[21 + fd.xy1, Rj, :, :, :]
+        XCopy[21 + fd.zy1, Rj, :, :, :] .= X[21 + fd.xz1, Rj, :, :, :]
+        
+        XCopy[21 + fd.xy2, Rj, :, :, :] .= X[21 + fd.yz2, Rj, :, :, :]
+        XCopy[21 + fd.xz2, Rj, :, :, :] .= X[21 + fd.yx2, Rj, :, :, :]
+        XCopy[21 + fd.yz2, Rj, :, :, :] .= X[21 + fd.zx2, Rj, :, :, :]
+        XCopy[21 + fd.yx2, Rj, :, :, :] .= X[21 + fd.zy2, Rj, :, :, :]
+        XCopy[21 + fd.zx2, Rj, :, :, :] .= X[21 + fd.xy2, Rj, :, :, :]
+        XCopy[21 + fd.zy2, Rj, :, :, :] .= X[21 + fd.xz2, Rj, :, :, :]
+        
+        XCopy[21 + fd.xy3, Rj, :, :, :] .= X[21 + fd.yz3, Rj, :, :, :]
+        XCopy[21 + fd.xz3, Rj, :, :, :] .= X[21 + fd.yx3, Rj, :, :, :]
+        XCopy[21 + fd.yz3, Rj, :, :, :] .= X[21 + fd.zx3, Rj, :, :, :]
+        XCopy[21 + fd.yx3, Rj, :, :, :] .= X[21 + fd.zy3, Rj, :, :, :]
+        XCopy[21 + fd.zx3, Rj, :, :, :] .= X[21 + fd.xy3, Rj, :, :, :]
+        XCopy[21 + fd.zy3, Rj, :, :, :] .= X[21 + fd.xz3, Rj, :, :, :]
+    end
+
+    for n in eachindex(State.iSigma.x)
+        StateCopy.iSigma.x[n] = State.iSigma.y[n]
+        StateCopy.iSigma.y[n] = State.iSigma.z[n]
+        StateCopy.iSigma.z[n] = State.iSigma.x[n]
+
+        DerivCopy.iSigma.x[n] = Deriv.iSigma.y[n]
+        DerivCopy.iSigma.y[n] = Deriv.iSigma.z[n]
+        DerivCopy.iSigma.z[n] = Deriv.iSigma.x[n]
+    end
+
+    # println(Gamma[fd.zx2, 2, 1, 1, 1])
+    # println(State.Gamma[fd.yz2, 2, 1, 1, 1])
+
+    # State = deepcopy(State)
+    # Deriv = deepcopy(Derivcopy)
+    # println(Gamma[fd.yz2, 2, 1, 1, 1])
+
+    # X = deepcopy(XCopy)
+
+    return StateCopy, DerivCopy, XCopy
 end
 
 function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
@@ -291,21 +427,21 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             X_sum[fd.zx1] += -V12(fd.zz) * V34(fd.zx1) * Ptm[3, 3] - V12(fd.zx1) * V34(fd.xx) * Ptm[1, 1] - V12(fd.zy1) * V34(fd.yx1) * Ptm[2, 2]
             X_sum[fd.zy1] += -V12(fd.zz) * V34(fd.zy1) * Ptm[3, 3] - V12(fd.zy1) * V34(fd.yy) * Ptm[2, 2] - V12(fd.zx1) * V34(fd.xy1) * Ptm[1, 1]
             
-            ### Xab2 = -Vab2 Vab2 - Vab3 Vba3
-            X_sum[fd.xy2] += -V12(fd.xy2) * V34(fd.xy2) * Ptm[2, 1] - V12(fd.xy3) * V34(fd.yx3) * Ptm[1, 2]
-            X_sum[fd.xz2] += -V12(fd.xz2) * V34(fd.xz2) * Ptm[3, 1] - V12(fd.xz3) * V34(fd.zx3) * Ptm[1, 3]
-            X_sum[fd.yx2] += -V12(fd.yx2) * V34(fd.yx2) * Ptm[1, 2] - V12(fd.yx3) * V34(fd.xy3) * Ptm[2, 1]
-            X_sum[fd.yz2] += -V12(fd.yz2) * V34(fd.yz2) * Ptm[3, 2] - V12(fd.yz3) * V34(fd.zy3) * Ptm[2, 3]
-            X_sum[fd.zx2] += -V12(fd.zx2) * V34(fd.zx2) * Ptm[1, 3] - V12(fd.zx3) * V34(fd.xz3) * Ptm[3, 1]
-            X_sum[fd.zy2] += -V12(fd.zy2) * V34(fd.zy2) * Ptm[2, 3] - V12(fd.zy3) * V34(fd.yz3) * Ptm[3, 2]
+            # ### Xab2 = -Vab2 Vab2 - Vab3 Vba3
+            X_sum[fd.xy2] += -V12(fd.xy2) * V34(fd.xy2) * Ptm[1, 2] - V12(fd.xy3) * V34(fd.yx3) * Ptm[2, 1]
+            X_sum[fd.xz2] += -V12(fd.xz2) * V34(fd.xz2) * Ptm[1, 3] - V12(fd.xz3) * V34(fd.zx3) * Ptm[3, 1]
+            X_sum[fd.yx2] += -V12(fd.yx2) * V34(fd.yx2) * Ptm[2, 1] - V12(fd.yx3) * V34(fd.xy3) * Ptm[1, 2]
+            X_sum[fd.yz2] += -V12(fd.yz2) * V34(fd.yz2) * Ptm[2, 3] - V12(fd.yz3) * V34(fd.zy3) * Ptm[3, 2]
+            X_sum[fd.zx2] += -V12(fd.zx2) * V34(fd.zx2) * Ptm[3, 1] - V12(fd.zx3) * V34(fd.xz3) * Ptm[1, 3]
+            X_sum[fd.zy2] += -V12(fd.zy2) * V34(fd.zy2) * Ptm[3, 2] - V12(fd.zy3) * V34(fd.yz3) * Ptm[2, 3]
 
-            ### Xab3 = -Vab2 Vab3 - Vab3 Vba2
-            X_sum[fd.xy3] += -V12(fd.xy2) * V34(fd.xy3) * Ptm[2, 1] - V12(fd.xy3) * V34(fd.yx2) * Ptm[1, 2]
-            X_sum[fd.xz3] += -V12(fd.xz2) * V34(fd.xz3) * Ptm[3, 1] - V12(fd.xz3) * V34(fd.zx2) * Ptm[1, 3]
-            X_sum[fd.yx3] += -V12(fd.yx2) * V34(fd.yx3) * Ptm[1, 2] - V12(fd.yx3) * V34(fd.xy2) * Ptm[2, 1]
-            X_sum[fd.yz3] += -V12(fd.yz2) * V34(fd.yz3) * Ptm[3, 2] - V12(fd.yz3) * V34(fd.zy2) * Ptm[2, 3]
-            X_sum[fd.zx3] += -V12(fd.zx2) * V34(fd.zx3) * Ptm[1, 3] - V12(fd.zx3) * V34(fd.xz2) * Ptm[3, 1]
-            X_sum[fd.zy3] += -V12(fd.zy2) * V34(fd.zy3) * Ptm[2, 3] - V12(fd.zy3) * V34(fd.yz2) * Ptm[3, 2]
+            # ### Xab3 = -Vab2 Vab3 - Vab3 Vba2
+            X_sum[fd.xy3] += -V12(fd.xy2) * V34(fd.xy3) * Ptm[1, 2] - V12(fd.xy3) * V34(fd.yx2) * Ptm[2, 1]
+            X_sum[fd.xz3] += -V12(fd.xz2) * V34(fd.xz3) * Ptm[1, 3] - V12(fd.xz3) * V34(fd.zx2) * Ptm[3, 1]
+            X_sum[fd.yx3] += -V12(fd.yx2) * V34(fd.yx3) * Ptm[2, 1] - V12(fd.yx3) * V34(fd.xy2) * Ptm[1, 2]
+            X_sum[fd.yz3] += -V12(fd.yz2) * V34(fd.yz3) * Ptm[2, 3] - V12(fd.yz3) * V34(fd.zy2) * Ptm[3, 2]
+            X_sum[fd.zx3] += -V12(fd.zx2) * V34(fd.zx3) * Ptm[3, 1] - V12(fd.zx3) * V34(fd.xz2) * Ptm[1, 3]
+            X_sum[fd.zy3] += -V12(fd.zy2) * V34(fd.zy3) * Ptm[3, 2] - V12(fd.zy3) * V34(fd.yz2) * Ptm[2, 3]
 		end
 
 		X[:, Rij, is, it, iu] .+= X_sum
@@ -357,8 +493,8 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             + V13(fd.xz2) * V24(fd.xz2) * P_(3, 3))
         
             + (V31(fd.xx) * V42(fd.xx) * PT_(1, 1)
-            + V31(fd.xy2) * V42(fd.xy2) * PT_(2, 2) 
-            + V31(fd.xz2) * V42(fd.xz2) * PT_(2, 2))
+            + V31(fd.xy2) * V42(fd.xy2) * PT_(2, 2)
+            + V31(fd.xz2) * V42(fd.xz2) * PT_(3, 3))
         )
 
         X_sum[21 + fd.yy] += (
@@ -488,9 +624,9 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             + V13(fd.zy2) * V24(fd.yy) * P_(2, 2)
             + V13(fd.zx2) * V24(fd.yx2) * P_(1, 1))
 
-            + (V13(fd.zz) * V24(fd.yz2) * PT_(3, 3)
-            + V13(fd.zy2) * V24(fd.yy) * PT_(2, 2)
-            + V13(fd.zx2) * V24(fd.yx2) * PT_(1, 1))
+            + (V31(fd.zz) * V42(fd.yz2) * PT_(3, 3)
+            + V31(fd.zy2) * V42(fd.yy) * PT_(2, 2)
+            + V31(fd.zx2) * V42(fd.yx2) * PT_(1, 1))
         )
 
         ### Yab3 = Vab3 Vba1 + Vab1 Vba3 + (w -- -w + t)
@@ -591,7 +727,7 @@ function getXBubble!(Workspace, T::Real)
                 if (ns+nt+nu)%2 == 0	# skip unphysical bosonic frequency combinations
                     continue
                 end
-                addY!(Workspace, is, it, iu, nw, spropY) # add to XTilde-type bubble functions
+                # addY!(Workspace, is, it, iu, nw, spropY) # add to XTilde-type bubble functions
 
                 ### If no u--t symmetry, then add all the bubbles
                 ### If use u--t symmetry, then only add for nu smaller then nt (all other obtained by symmetry)
@@ -782,7 +918,7 @@ function OneLoopWorkspace(State, Deriv, X, Par)
 end
 
 using JLD2
-function getDeriv!(Deriv, State, setup, Lam; saveArgs = true)
+function getDeriv!(Deriv, State, setup, Lam; saveArgs=true)
 
     (X, Par) = setup # use pre-allocated X and XTilde to reduce garbage collector time
     Workspace = OneLoopWorkspace(State, Deriv, X, Par)
@@ -829,7 +965,9 @@ function InitializeState(Par, isotropy)
     );
 
     Gamma = State.x[5]
+
     setToBareVertex!(Gamma, couplings, isotropy)
+
     return State
 
 end
@@ -889,14 +1027,6 @@ function testPMFRG!(State, setup, Deriv!::Function; loadArgs = false)
 
     der = copy(State)
     setZero!(der)
-
-    if(loadArgs)
-        args = load_object("noah_flow_args.jld2")
-        der = args[1]
-        State = args[2]
-        setup = args[3]
-        t0 = args[4]
-    end
 
     Deriv_subst!(der, State, setup, t0, s=false)
 end

@@ -67,58 +67,39 @@ function ChiHom(T, w, j)
     )
 end
 
-Trange = 0.05:0.25:3.5
-
-fullRange = []
-x = range(0.05, 3.5, length=200)
-
 chiVals_x = []
 chiVals_y = []
 chiVals_z = []
 
 using JLD2
-for T in Trange
-    sol = load_object("Tflow/flow$T.jld2")
-    chi_x = sol[1][end][2]
-    chi_y = sol[2][end][2]
-    chi_z = sol[3][end][2]
-    append!(chiVals_x, chi_x)
-    append!(chiVals_y, chi_y)
-    append!(chiVals_z, chi_z)
-    append!(fullRange, T)
+data = load_object("ChiDimer.jld2")
+
+length(data)
+
+for n in eachindex(data)
+    append!(chiVals_x, data[n][1].Chi_x[2])
+    append!(chiVals_y, data[n][1].Chi_y[2])
+    append!(chiVals_z, data[n][1].Chi_z[2])
 end
 
-Trange2 = 0.15:0.1:1.0
-for T in Trange2
-    if(T == 55)
-        continue
-    end
+isotropy = [0.4, 0.0, 1.0]
 
-    sol = load_object("Tflow/flow$T.jld2")
-    chi_x = sol[1][end][2]
-    chi_y = sol[2][end][2]
-    chi_z = sol[3][end][2]
-    append!(chiVals_x, chi_x)
-    append!(chiVals_y, chi_y)
-    append!(chiVals_z, chi_z)
-    append!(fullRange, T)
-end
-
-isotropy = [1.0, 2.0, 3.0] * 0.37139
+T = [data[n][end] for n in eachindex(data)]
 
 fig = Figure()
 ax = Axis(
     fig[1,1],
     ylabel = L"χ",
     xlabel = L"T",
-    title = "Jx = 0.37, Jy = 0.74, Jz = 1.11"
+    title = "Jx = 0.4, Jy = 0.0, Jz = 1.0"
     )
-lines!(ax, x, Chi_x.(x, isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_x")
-lines!(ax, x, Chi_y.(x, isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_y")
-lines!(ax, x, Chi_z.(x, isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_z")
-scatter!(ax, fullRange,chiVals_x, marker=:diamond, markersize=10)
-scatter!(ax, fullRange,chiVals_y, marker=:diamond, markersize=10)
-scatter!(ax, fullRange,chiVals_z, marker=:diamond, markersize=10)
+n = 350
+lines!(ax, T[n:end], Chi_x.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_x")
+lines!(ax, T[n:end], Chi_y.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_y")
+lines!(ax, T[n:end], Chi_z.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_z")
+scatter!(ax, T[n:end], chiVals_x[n:end], marker=:diamond, markersize=5)
+scatter!(ax, T[n:end], chiVals_y[n:end], marker=:diamond, markersize=5)
+scatter!(ax, T[n:end], chiVals_z[n:end], marker=:diamond, markersize=5)
 # lines!(ax, x, ChiHom.(x, 0, 1.0))
 axislegend(ax, position=:rt)
 display("image/png", fig)
