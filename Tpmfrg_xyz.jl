@@ -914,7 +914,7 @@ function generateSubstituteDeriv(getDeriv!::Function)
     
 end
 
-function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector, isotropy::Array{T}) where T
+function setToBareVertex!(Gamma::AbstractArray{T,5}, couplings::AbstractVector, isotropy::Array{T, 2}) where T
     for Rj in axes(Gamma,2)
         Gamma[fd.yz2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,1]
         Gamma[fd.zy2, Rj, :, :, :] .= -couplings[Rj] * isotropy[Rj,1]

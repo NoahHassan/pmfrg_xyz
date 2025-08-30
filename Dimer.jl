@@ -4,6 +4,9 @@ Pkg.activate(".")
 include("Tpmfrg_xyz.jl")
 using .Tpmfrg_xyz
 
+include("pmfrg_xyz.jl")
+using .pmfrg_xyz
+
 using JLD2
 using RecursiveArrayTools
 using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
@@ -22,11 +25,33 @@ let
         N = 8,
         accuracy = 1e-10,
         temp_max = 100.,
-        temp_min = 1.0
+        temp_min = 0.1
     )
 
-    sol, saved_values = Tpmfrg_xyz.SolveFRG(Par, isotropy, method = Euler());
-    save_object("ChiDimer.jld2", [(saved_values.saveval[n], exp(saved_values.t[n])) for n in 1:length(saved_values.t)])
+    sol, saved_values = Tpmfrg_xyz.SolveFRG(Par, isotropy, method = DP5());
+    save_object("ChiDimer_TFlow_Low.jld2", [(saved_values.saveval[n], exp(saved_values.t[n])) for n in 1:length(saved_values.t)])
+end
+
+# Test with Λ-Flow
+let
+    Trange = LinRange(1.0, 0.1, 100)
+
+    chis = []
+    for T_ in Trange
+        println("T = $T_")
+        Par = pmfrg_xyz.Params(
+            System,
+            T = T_,
+            N = 8,
+            accuracy = 1e-10,
+            lambda_max = 100.,
+            lambda_min = 0.1
+        )
+
+        sol, saved_values = pmfrg_xyz.SolveFRG(Par, isotropy, method = DP5());
+        append!(chis, (saved_values.saveval[end], T_))
+    end
+    save_object("ChiDimer_LFlow_Low.jld2", chis)
 end
 
 function CompareArrays(arr1, arr2)

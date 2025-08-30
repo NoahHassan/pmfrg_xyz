@@ -72,7 +72,7 @@ chiVals_y = []
 chiVals_z = []
 
 using JLD2
-data = load_object("ChiDimer.jld2")
+data = load_object("ChiDimer_TFlow_Low.jld2")
 
 length(data)
 
@@ -91,9 +91,9 @@ ax = Axis(
     fig[1,1],
     ylabel = L"χ",
     xlabel = L"T",
-    title = "Jx = 0.4, Jy = 0.0, Jz = 1.0"
+    title = "T-Flow J=[0.4,0,1]"
     )
-n = 350
+n = 400
 lines!(ax, T[n:end], Chi_x.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_x")
 lines!(ax, T[n:end], Chi_y.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_y")
 lines!(ax, T[n:end], Chi_z.(T[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_z")
@@ -104,6 +104,41 @@ scatter!(ax, T[n:end], chiVals_z[n:end], marker=:diamond, markersize=5)
 axislegend(ax, position=:rt)
 display("image/png", fig)
 
+# Λ-Flow
+chiVals_x = []
+chiVals_y = []
+chiVals_z = []
+temps = []
+
+using JLD2
+data = load_object("ChiDimer_LFlow_Low.jld2")
+
+for n in 1:2:199
+    append!(chiVals_x, data[n].Chi_x[2])
+    append!(chiVals_y, data[n].Chi_y[2])
+    append!(chiVals_z, data[n].Chi_z[2])
+    append!(temps, data[n+1])
+end
+
+isotropy = [0.4, 0.0, 1.0]
+
+fig = Figure()
+ax = Axis(
+    fig[1,1],
+    ylabel = L"χ",
+    xlabel = L"T",
+    title = "Λ-Flow J=[0.4,0,1], Λ=0.1"
+    )
+n = 1
+lines!(ax, temps[n:end], Chi_x.(temps[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_x")
+lines!(ax, temps[n:end], Chi_y.(temps[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_y")
+lines!(ax, temps[n:end], Chi_z.(temps[n:end], isotropy[1], isotropy[2], isotropy[3]), linewidth=2, label=L"χ_z")
+scatter!(ax, temps[n:end], chiVals_x[n:end], marker=:diamond, markersize=5)
+scatter!(ax, temps[n:end], chiVals_y[n:end], marker=:diamond, markersize=5)
+scatter!(ax, temps[n:end], chiVals_z[n:end], marker=:diamond, markersize=5)
+# lines!(ax, x, ChiHom.(x, 0, 1.0))
+axislegend(ax, position=:rt)
+display("image/png", fig)
 
 
 ### Check self energy error
