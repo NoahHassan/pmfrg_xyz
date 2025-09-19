@@ -1,10 +1,1 @@
-TFlow_cluster_01/
-TFlow_cluster_02/
-TFlow_cluster_03/
-TflowSigma/
-TflowSigma2/
-TflowSigma3/
-TflowSigma4/
-benchmarks/
-FiniteSizeScaling/
-plots/
+ignore/
