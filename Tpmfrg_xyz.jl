@@ -24,24 +24,33 @@ function setZero!(a::T) where T
     return a
 end
 
+# In my convention instead of γ I use iΣ
+# Since iΣ now carries three flavors I create a struct for it
 struct SigmaType{T}
     x::Array{T, 2}
     y::Array{T, 2}
     z::Array{T, 2}
 end
 
+# Previously there existed a Γ::VertexType with VertexType containing
+# the three Γ-flavors. Since here I have 21 I opted to add one
+# array-dimension as opposed to enlarge the struct.
 struct StateType{T}
     f_int::Vector{T}
     iSigma::SigmaType{T}
     Gamma::Array{T, 5}
 end
 
+# the XYZ model may give different Χ_x, Χ_y, X_z
 struct Observables{T}
     Chi_x::Vector{T}
     Chi_y::Vector{T}
     Chi_z::Vector{T}
 end
 
+# np_vec is removed because
+# ns = np_vec[is] is the same
+# as simply ns = is - 1
 struct NumericalParams{T<:Real}
     N::Int
 
@@ -53,17 +62,35 @@ struct NumericalParams{T<:Real}
     lenIntw_acc::Int
 end
 
+# Remnant from the old code that I havent implemented yet
 struct OptionParams
     use_symmetry::Bool
     minimal_output::Bool
 end
 
+# The code doesnt work for some reason if I name this struct
+# OneLoopParams
 struct OneLoopParams_1{T,SType}
     System::SType
     NumericalParams::NumericalParams{T}
     Options::OptionParams
 end
 
+# Similar to Gamma I give X an extra dimension as opposed to create
+# A BubbleType struct for it
+struct OneLoopWorkspace{T,ParType}
+    State::StateType{T}
+    Deriv::StateType{T}
+    X::Array{T, 5}
+    Par::ParType
+end
+
+# For a general Vertex there can be 3^4 = 81 flavor combinations
+# In the XYZ model the SO(3) symmetry breaks down to a residual Klein-4 Symmetry
+# This means that the Vertex function can only depend on two distinct flavors at most
+# This gives 21 different Vertex functions.
+# In my convention I dont use X and ̃X but just one big array called X.
+# If I need to acces the ̃X part (which in my convention I name Y) I just go X[21 + flavor]
 getVDims(Par) = (21, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 getBubbleVDims(Par) = (42, Par.System.Npairs, Par.NumericalParams.N, Par.NumericalParams.N, Par.NumericalParams.N)
 _getFloatType(Par) = typeof(Par.NumericalParams.accuracy)
@@ -89,6 +116,8 @@ StateType(f_int, iSigma_x, iSigma_y, iSigma_z, Gamma) = StateType(f_int, SigmaTy
 RecursiveArrayTools.ArrayPartition(x) = ArrayPartition(x.f_int, x.iSigma.x, x.iSigma.y, x.iSigma.z, x.Gamma)
 StateType(Arr::ArrayPartition) = StateType(Arr.x...)
 
+# The constructor of this is just blind-copied. To this day I dont really understand
+# the purpose of lenIntw and lenIntw_acc
 function NumericalParams(;
     N::Integer = 24,
 
@@ -112,6 +141,18 @@ function NumericalParams(;
     )
 end
 
+function OneLoopWorkspace(State, Deriv, X, Par)
+    setZero!(Deriv)
+    setZero!(X)
+
+    return OneLoopWorkspace(
+        StateType(State.x...),
+        StateType(Deriv.x...),
+        X,
+        Par
+    )
+end
+
 OptionParams(;use_symmetry::Bool = true,MinimalOutput::Bool = false,kwargs...) = OptionParams(use_symmetry,MinimalOutput)
 Params(System;kwargs...) = OneLoopParams_1(System,NumericalParams(;kwargs...),OptionParams(;kwargs...))
 
@@ -129,7 +170,7 @@ end
 
 function get_sign_iw(nw::Integer,N::Integer)
     # s = sign(nw)
-    nw_bounds = min(nw, N - 1)  ### used to be min(abs(nw),...), but nw is set positive in gamma
+    nw_bounds = min(nw, N - 1)  ### used to be min(abs(nw),...), but nw is set positive in iSigma_
     return nw_bounds + 1        ### used to be s * ...
 end
 
@@ -167,10 +208,13 @@ end
 ######### VERTICES ## VERTICES ## VERTICES #########
 ####################################################
 
-### Symmetries: 
-###     s <--> -s
-###     t <--> -t, i <--> j
-###     u <--> -u, i <--> j
+# In the Heisenberg case these are the Vertex' Symmetries 
+#     s <--> -s
+#     t <--> -t, i <--> j
+#     u <--> -u, i <--> j
+# In the XYZ model a change of frequency sign also means a change
+# of flavor type. I separate the Vertex flavors into four blocks.
+# Transformations of flavors only transform within those blocks.
 function ConvertFreqArgs(ns, nt, nu, Nw)
     ns, nt, nu = abs.((ns, nt, nu))
 
@@ -184,6 +228,8 @@ end
 using LinearAlgebra
 using SparseArrays
 
+# I include isFlavorTransform for optimization purposes. The integer n
+# labels the Vertex flavor.
 function V_(
     Vertex::AbstractArray, n::Int, ns::Int, nt::Int, nu::Int,
     isFlavorTransform::Tuple{Bool, Bool, Bool},
@@ -195,6 +241,8 @@ function V_(
     n_transf = n
     if(block != 0)
         if(isFlavorTransform[block])
+            # This transforms a block (a,b,c,d,e,f) into (d,e,f,a,b,c)
+            # The layout of the fd-module is hence *very* important
             n_transf = ((n-3) - (block-1)*6 + 2) % 6 + 1 + 3 + (block-1)*6
         end
     end
@@ -222,6 +270,7 @@ function mixedFrequencies(ns,nt,nu,nwpr)
 	return wpw1, wpw2, wpw3, wpw4, wmw1, wmw2, wmw3, wmw4
 end
 
+# This defines the Vertex flavors. module was the fastest option
 module fd
     const xx = 1
     const yy = 2
@@ -246,6 +295,8 @@ module fd
     const zy3 = 21
 end
 
+# The main bottleneck seems to me to be located in the creation of large
+# arrays of size 42 and 21 and the continued calling fo the V_ function.
 function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, Props)
 	(; State, X, Par) = Workspace
 	N = Par.NumericalParams.N
@@ -341,6 +392,8 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 		Rji = invpairs[Rij] # store pair corresponding to Rji (easiest case: Rji = Rij) 
 		(; xi, xj) = PairTypes[Rij]
 
+        # For some reason promoting P_ and PT_ to SMatrix objects
+        # reduces performance slightly
         function P_(n::Int, m::Int)
             return Props[xi, xj, n, m]
         end
@@ -583,7 +636,6 @@ function getXBubble!(Workspace, T::Real)
         ### Relative minus sign between paper & Nils' thesis
         return -BubbleProp
 		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
-        ### SMatrix can only create 2d array (according to ChatGPT). Use SArray instead
 	end
 
 	for is in 1:N, it in 1:N
@@ -768,25 +820,6 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
             end
 		end
 	end
-end
-
-struct OneLoopWorkspace{T,ParType}
-    State::StateType{T}
-    Deriv::StateType{T}
-    X::Array{T, 5}
-    Par::ParType
-end
-
-function OneLoopWorkspace(State, Deriv, X, Par)
-    setZero!(Deriv)
-    setZero!(X)
-
-    return OneLoopWorkspace(
-        StateType(State.x...),
-        StateType(Deriv.x...),
-        X,
-        Par
-    )
 end
 
 using JLD2
