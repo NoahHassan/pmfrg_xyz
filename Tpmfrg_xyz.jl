@@ -758,7 +758,7 @@ function getDFint!(Workspace, T::Real)
 		sumres = 0.
 		for nw in -lenIntw_acc:lenIntw_acc-1
 			w = get_w(nw,T)
-			sumres += iSx(x, nw) / iGy(x, nw) * iSigmax(x, nw) / w
+			sumres += iSx(x, nw) / iGx(x, nw) * iSigmax(x, nw) / w
             sumres += iSy(x, nw) / iGy(x, nw) * iSigmay(x, nw) / w
             sumres += iSz(x, nw) / iGz(x, nw) * iSigmaz(x, nw) / w
         end
@@ -885,7 +885,8 @@ end
 
 function launchPMFRG!(State, setup, Deriv!::Function;
     method = DP5(),
-    npoints = 600
+    npoints = 600,
+    save_steps=false
     )
 
     Par = setup[end]
@@ -914,7 +915,7 @@ function launchPMFRG!(State, setup, Deriv!::Function;
         method,
         reltol = accuracy,
         abstol = accuracy,
-        save_everystep = false,
+        save_everystep = save_steps,
         callback = saveCB,
         dt=Lam_to_t(0.2 * temp_max)
     )
