@@ -1,12 +1,12 @@
 module pmfrg_xyz
 
-using RecursiveArrayTools
-using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
-using SpinFRGLattices.StaticArrays
-
 #################################################
 ######### STRUCTS ## STRUCTS ## STRUCTS #########
 #################################################
+
+using RecursiveArrayTools
+using SpinFRGLattices,OrdinaryDiffEq,DiffEqCallbacks,RecursiveArrayTools,StructArrays
+using SpinFRGLattices.StaticArrays
 
 setZero!(a::AbstractArray{T,N}) where {T,N} = fill!(a,zero(T))
 
