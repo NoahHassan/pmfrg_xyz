@@ -1,4 +1,4 @@
-module Tpmfrg_xyz
+module PMFRG_xyz
 
 #################################################
 ######### STRUCTS ## STRUCTS ## STRUCTS #########
