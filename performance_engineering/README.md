@@ -9,88 +9,42 @@ This Julia project contains tools for profiling and benchmarking the code in pmf
 - **ProfileSVG.jl**: SVG-based profile visualization
 - **FlameGraphs.jl**: Flame graph visualization for profiling
 
-## Usage
-Activate this project environment:
-```bash
-julia --project=pmfrg_xyz/performance_engineering
-```
-
-### Profiling with PProf
-
-```julia
-using PProf
-
-# Profile your code
-@pprof myfunction(args...)
-
-# Or profile a code block
-@profile begin
-    # your code here
-end
-pprof()
-```
-
-### Benchmarking with BenchmarkTools
-
-```julia
-using BenchmarkTools
-
-# Quick benchmark
-@btime myfunction($args)
-
-# Detailed benchmark
-@benchmark myfunction($args)
-
-# Save benchmark results
-b = @benchmark myfunction($args)
-```
-
-### Profile Visualization
-
-```julia
-using ProfileSVG, Profile
-
-# Profile and save as SVG
-@profile myfunction(args...)
-ProfileSVG.save("profile.svg")
-
-# Or use FlameGraphs
-using FlameGraphs
-@profile myfunction(args...)
-flamegraph()
-```
-
 ## Ready-to-Use Scripts
 
-### Profile Dimer Anisotropy Example
+### Profiling Examples
 
-Profile the dimer anisotropy calculation with PProf:
+Profile any example with PProf (`dimer` or `square_lattice`):
 ```bash
-julia pmfrg_xyz/performance_engineering/profile_dimer_anisotropy.jl
+julia pmfrg_xyz/performance_engineering/profile.jl [example_name]
+```
+
+Examples:
+```bash
+# Profile dimer example (default)
+julia pmfrg_xyz/performance_engineering/profile.jl
+julia pmfrg_xyz/performance_engineering/profile.jl dimer
+
+# Profile square lattice example
+julia pmfrg_xyz/performance_engineering/profile.jl square_lattice
 ```
 
 This will:
 - Run the calculation once for compilation
 - Profile the second run with detailed call stack information
+- Save profile data to `profile_data/profile_<example>_<commit>.pb.gz`
 - Open an interactive pprof viewer in your browser
 
-### Benchmark Dimer Anisotropy Example
+### Benchmarking Examples (STILL WIP)
 
-Benchmark the dimer anisotropy calculation:
-```bash
-julia pmfrg_xyz/performance_engineering/benchmark_dimer_anisotropy.jl
-```
-
-This will:
-- Run the calculation once for compilation
+The script `pmfrg_xyz/performance_engineering/benchmark.jl`
+works in similar way as the profiling script and:
 - Perform multiple runs to get accurate timing statistics
 - Display min/median/mean/max execution times
+- Save results to `benchmark_data/benchmark_<example>_<commit>.txt`
 
-## Example Workflow
+Note: this is now impractical because these examples 
+take still too long 
+for their benchmark to be useful.
 
-1. Use the ready-to-use scripts above for common profiling tasks
-2. Or create custom profiling scripts:
-   - Activate the environment: `julia --project=pmfrg_xyz/performance_engineering`
-   - Load your code: `include("../Lpmfrg_xyz.jl")` or `include("../Tpmfrg_xyz.jl")`
-   - Profile or benchmark the functions you want to optimize
-   - Visualize results and identify bottlenecks
+TODO: Benchmarks would be useful for smaller functions. 
+

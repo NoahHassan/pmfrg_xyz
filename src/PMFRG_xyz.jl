@@ -888,6 +888,7 @@ function launchPMFRG!(State, setup, Deriv!::Function;
     npoints = 600,
     save_steps=false
     )
+    println("Solving FRG")
 
     Par = setup[end]
     (; temp_max, temp_min, accuracy) = Par.NumericalParams
