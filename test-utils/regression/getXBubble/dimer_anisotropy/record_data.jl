@@ -1,33 +1,25 @@
 #!/usr/bin/env julia
 # Script to record regression test data for getXBubble! function
 #
-# Usage:
-#   1. Apply the patch: git apply test/patches/add_recorder_getxbubble.patch
-#   2. Run this script: julia --project=examples test/regression/getXBubble/dimer_anisotropy/record_data.jl
-#   3. Unapply patch: git apply -R < test/patches/add_recorder_getxbubble.patch
+using Recorder
+using SpinFRGLattices
+import PMFRG_xyz: Params, SolveFRG
 
-using Pkg
-
+function print_usage()
+    println( "1. Apply the patch: git apply test-utils/patches/add_recorder_getxbubble.patch")
+    println( "2. Add Recorder.jl to the project")
+    println( "2. Run this script: julia --project=test-utils test/regression/getXBubble/dimer_anisotropy/record_data.jl")
+    println( "3. Unapply patch: git apply -R < test-utils/patches/add_recorder_getxbubble.patch")
+end
+    
 function main()::Int
-    setup_environment()
     record_test_data()
-    generate_regression_tests()
-    print_summary()
+    script_fname = generate_regression_tests()
+    print_summary(script_fname)
     return 0
 end
 
 # level 1
-function setup_environment()
-    println("Setting up environment...")
-    test_utils_dir = get_test_utils_directory()
-    Pkg.activate(test_utils_dir)
-
-    println("Loading packages...")
-    @eval using Recorder
-    @eval using SpinFRGLattices
-    @eval import PMFRG_xyz: Params, SolveFRG
-end
-
 function record_test_data()
     println("\nRunning dimer example with recording enabled...")
     println("This will record every 5th call to getXBubble! (calls 1, 6, 11, ..., 46)")
@@ -41,8 +33,48 @@ function record_test_data()
         println("\nRecorded $call_count calls to $(keys_list[1])")
     else
         println("\nWarning: No calls were recorded!")
+        println("\nHave you applied the patch correctly?")
     end
 end
+
+
+function generate_regression_tests()
+    println("\nGenerating regression test files...")
+
+    current_dir = pwd()
+
+
+    try
+        cd(@__DIR__)
+        fname, _  = Recorder.create_regression_tests(tag="getXBubble_dimer")
+        return joinpath(@__DIR__,fname)
+    finally
+        cd(current_dir)
+    end
+end
+
+function print_summary(script_fname)
+    data_file = joinpath(@__DIR__, "regression_tests_getXBubble_dimer.data")
+    test_file = script_fname 
+
+    println("\n" * "="^80)
+    println("Regression test data recorded successfully!")
+    println("="^80)
+    println("\nGenerated files:")
+    println("  Data: $data_file")
+    println("  Test: $test_file")
+    println("\nNext steps:")
+    println("  1. Unapply the patch:")
+    println("     cd /home/michele/PMFRG/pmfrg_xyz")
+    println("     git apply -R  < test-utils/patches/add_recorder_getxbubble.patch")
+    println("\n  2. Review and customize the generated test file")
+    println("     (especially floating-point comparisons)")
+    println("\n  3. Run tests:")
+    println("     julia --project=test-utils $test_file")
+    println("="^80)
+end
+
+# level 2
 
 function run_dimer_example()
     @eval begin
@@ -61,54 +93,6 @@ function run_dimer_example()
 
         results = SolveFRG(par,isotropy)
     end
-end
-
-function generate_regression_tests()
-    println("\nGenerating regression test files...")
-
-    # Change to output directory to generate files there
-    current_dir = pwd()
-
-    try
-        Base.invokelatest(Recorder.create_regression_tests,
-            tag="getXBubble_dimer",
-            state=Recorder.gs
-        )
-    finally
-        cd(current_dir)
-    end
-end
-
-function print_summary()
-    data_file = joinpath(@__DIR__, "regression_tests_getXBubble_dimer.data")
-    test_file = joinpath(@__DIR__, "regression_tests_getXBubble_dimer.jl")
-
-    println("\n" * "="^80)
-    println("Regression test data recorded successfully!")
-    println("="^80)
-    println("\nGenerated files:")
-    println("  Data: $data_file")
-    println("  Test: $test_file")
-    println("\nNext steps:")
-    println("  1. Unapply the patch:")
-    println("     cd /home/michele/PMFRG/pmfrg_xyz")
-    println("     patch -R -p1 < test/patches/add_recorder_getxbubble.patch")
-    println("\n  2. Review and customize the generated test file")
-    println("     (especially floating-point comparisons)")
-    println("\n  3. Run tests:")
-    println("     julia --project=examples $test_file")
-    println("="^80)
-end
-
-# level 2
-function get_test_utils_directory()::String
-    pmfrg_xyz_root = joinpath(@__DIR__, "../../../..")
-    joinpath(pmfrg_xyz_root, "test-utils")
-end
-
-function get_examples_directory()::String
-    pmfrg_xyz_root = joinpath(@__DIR__, "../../../..")
-    joinpath(pmfrg_xyz_root, "examples")
 end
 
 #######
