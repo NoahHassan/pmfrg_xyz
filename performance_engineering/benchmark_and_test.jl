@@ -18,21 +18,23 @@ function add_data_to_db(data)
 
 end
 
-function getXBubble_test_and_benchmark()
+function getXBubble_test_and_benchmark(record::Bool)
     println("Testing...")
     run_getXbubble_regression_tests()
     println("Benchmarking...")
     bench_result = benchmark_synthetic_square(N=10, lattice_size=5)
 
-    funcnames = ["mean","minimum","maximum"]
-    quantities = ["times","gctimes"]
+    if record
+        funcnames = ["mean","minimum","maximum"]
+        quantities = ["times","gctimes"]
 
 
-    data = Dict("commit" => GitUtils.get_git_commit_short(),
-                      "nthreads" => Threads.nthreads(),
-                      "benchmark_data" => Dict("$(q)_$(fn)"=> eval(Meta.parse("$fn($(getfield(bench_result, Symbol(q))))"))
-                for q in quantities
-                    for fn in funcnames))
-    add_data_to_db(data)
+        data = Dict("commit" => GitUtils.get_git_commit_short(),
+                          "nthreads" => Threads.nthreads(),
+                          "benchmark_data" => Dict("$(q)_$(fn)"=> eval(Meta.parse("$fn($(getfield(bench_result, Symbol(q))))"))
+                    for q in quantities
+                        for fn in funcnames))
+        add_data_to_db(data)
+    end
     return bench_result
 end
