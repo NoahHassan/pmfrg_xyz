@@ -638,7 +638,7 @@ function getXBubble!(Workspace, T::Real)
 		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
 	end
 
-	for is in 1:N, it in 1:N
+	Threads.@threads :static for (is,it)  in collect( (is,it) for is in 1:N, it in 1:N)
         BubbleProp = zeros(NUnique, NUnique, 3, 3)
         ns = is - 1
         nt = it - 1
