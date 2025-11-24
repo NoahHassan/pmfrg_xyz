@@ -402,6 +402,12 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 
     X_sum = @MVector zeros(42)
 
+    V13 = @MVector zeros(21) 
+    V24 = @MVector zeros(21) 
+    V31 = @MVector zeros(21) 
+    V42 = @MVector zeros(21) 
+
+
 	# Xtilde only defined for nonlocal pairs Rij != Rii
 	for Rij in 1:Npairs
 		Rij in OnsitePairs && continue
@@ -419,10 +425,12 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             return Props[xj, xi, m, n]
         end
 
-        V13 = @MVector [Vert(n, Rij, -wmw1, nt, wmw3, flavTransf13) for n in 1:21]
-        V24 = @MVector [Vert(n, Rij, wpw2, -nt, -wpw4, flavTransf24) for n in 1:21]
-        V31 = @MVector [Vert(n, Rij, wmw3, nt, -wmw1, flavTransf31) for n in 1:21]
-        V42 = @MVector [Vert(n, Rij, -wpw4, -nt, wpw2, flavTransf42) for n in 1:21]
+        for n in 1:21
+            V13[n] = Vert(n, Rij, -wmw1, nt, wmw3, flavTransf13)
+            V24[n] = Vert(n, Rij, wpw2, -nt, -wpw4, flavTransf24)
+            V31[n] = Vert(n, Rij, wmw3, nt, -wmw1, flavTransf31)
+            V42[n] = Vert(n, Rij, -wpw4, -nt, wpw2, flavTransf42)
+        end
 
         fill!(X_sum, 0.0)
 
