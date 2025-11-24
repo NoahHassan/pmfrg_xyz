@@ -43,6 +43,7 @@ function benchmark_from_regression_data()
 
     result = @benchmark getXBubble!($workspace, $lam)
     display(result)
+    result
 end
 
 function benchmark_synthetic_dimer(; N::Int=8)
@@ -53,6 +54,7 @@ function benchmark_synthetic_dimer(; N::Int=8)
 
     result = @benchmark getXBubble!($workspace, $lam)
     display(result)
+    result
 end
 
 function benchmark_synthetic_square(; N::Int=8, lattice_size::Int=4)
@@ -63,6 +65,7 @@ function benchmark_synthetic_square(; N::Int=8, lattice_size::Int=4)
 
     result = @benchmark getXBubble!($workspace, $lam)
     display(result)
+    result
 end
 
 # level 2
