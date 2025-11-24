@@ -344,12 +344,7 @@ function addX!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
 		for k_spl in 1:Nsum[Rij]
 			#loop over all Nsum summation elements defined in geometry. This inner loop is responsible for most of the computational effort! 
 			ki,kj,m,xk = S_ki[k_spl,Rij],S_kj[k_spl,Rij],S_m[k_spl,Rij],S_xk[k_spl,Rij]
-            Ptm = @SMatrix [
-                Props[xk, xk, 1, 1] Props[xk, xk, 1, 2] Props[xk, xk, 1, 3];
-                Props[xk, xk, 2, 1] Props[xk, xk, 2, 2] Props[xk, xk, 2, 3];
-                Props[xk, xk, 3, 1] Props[xk, xk, 3, 2] Props[xk, xk, 3, 3]
-            ]
-			Ptm = Ptm * m ### Props now contains two flavor indices
+            Ptm = m * Props[:,:,xk] ### Props now contains two flavor indices
 
             X_sum[fd.yy] += -V12[fd.yy,ki] * V34[fd.yy,kj] * Ptm[2, 2] - V12[fd.yz1,ki] * V34[fd.zy1,kj] * Ptm[3, 3] - V12[fd.yx1,ki] * V34[fd.xy1,kj] * Ptm[1, 1]
             X_sum[fd.zz] += -V12[fd.zz,ki] * V34[fd.zz,kj] * Ptm[3, 3] - V12[fd.zx1,ki] * V34[fd.xz1,kj] * Ptm[1, 1] - V12[fd.zy1,ki] * V34[fd.yz1,kj] * Ptm[2, 2]
@@ -663,12 +658,34 @@ function getXBubble!(Workspace, T::Real)
 		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
 	end
 
+	function getKataninPropX!(nw1,nw2)
+        BubbleProp = zeros(3, 3, NUnique)
+        
+		for i in 1:Par.System.NUnique
+            ### Relative minus sign between paper & Nils' thesis
+			BubbleProp[ 1, 1,i] = -iSKatx(i, nw1) * iGx(i, nw2)
+			BubbleProp[ 1, 2,i] = -iSKatx(i, nw1) * iGy(i, nw2)
+			BubbleProp[ 1, 3,i] = -iSKatx(i, nw1) * iGz(i, nw2)
+			BubbleProp[ 2, 1,i] = -iSKaty(i, nw1) * iGx(i, nw2)
+			BubbleProp[ 2, 2,i] = -iSKaty(i, nw1) * iGy(i, nw2)
+			BubbleProp[ 2, 3,i] = -iSKaty(i, nw1) * iGz(i, nw2)
+			BubbleProp[ 3, 1,i] = -iSKatz(i, nw1) * iGx(i, nw2)
+			BubbleProp[ 3, 2,i] = -iSKatz(i, nw1) * iGy(i, nw2)
+			BubbleProp[ 3, 3,i] = -iSKatz(i, nw1) * iGz(i, nw2)
+		end
+
+        return SArray{Tuple{3,3,NUnique}}(BubbleProp)
+	end
+
+
+
+
 	Threads.@threads :static for (is,it)  in collect( (is,it) for is in 1:N, it in 1:N)
         BubbleProp = zeros(NUnique, NUnique, 3, 3)
         ns = is - 1
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
-            spropX = getKataninProp!(BubbleProp,nw,nw+ns)
+            spropX = getKataninPropX!(nw,nw+ns)
             spropY = getKataninProp!(BubbleProp,nw,nw-nt)
             for iu in 1:N
                 nu = iu - 1
