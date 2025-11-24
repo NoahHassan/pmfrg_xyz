@@ -34,9 +34,7 @@ function (recursive_value_equality(
     )
 end
 
-
-function run_regression_tests()
-    @testset verbose = true "Regression Tests for PMFRG_xyz, dimer anisotropy" begin
+function run_getXbubble_regression_tests()
         @testset verbose = true "Tests for PMFRG_xyz.getXBubble!" begin
             Core.@doc "You might need to modify this function!" function compare_return_values(
                 rvexp,
@@ -61,7 +59,11 @@ function run_regression_tests()
                       compare_arguments_post(arguments, arguments_post)
             end
         end
-        @testset verbose = true "Tests for PMFRG_xyz.SolveFRG" begin
+        end
+ 
+
+function run_SolveFRG_regression_tests()
+       @testset verbose = true "Tests for PMFRG_xyz.SolveFRG" begin
             Core.@doc "You might need to modify this function!" function compare_return_values(
                 rvexp,
                 rv,
@@ -85,4 +87,4 @@ function run_regression_tests()
             end
         end
     end
-end
+
