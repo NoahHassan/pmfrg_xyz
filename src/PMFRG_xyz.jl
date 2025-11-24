@@ -419,10 +419,10 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
             return Props[xj, xi, m, n]
         end
 
-        V13 = @SVector [Vert(n, Rij, -wmw1, nt, wmw3, flavTransf13) for n in 1:21]
-        V24 = @SVector [Vert(n, Rij, wpw2, -nt, -wpw4, flavTransf24) for n in 1:21]
-        V31 = @SVector [Vert(n, Rij, wmw3, nt, -wmw1, flavTransf31) for n in 1:21]
-        V42 = @SVector [Vert(n, Rij, -wpw4, -nt, wpw2, flavTransf42) for n in 1:21]
+        V13 = @MVector [Vert(n, Rij, -wmw1, nt, wmw3, flavTransf13) for n in 1:21]
+        V24 = @MVector [Vert(n, Rij, wpw2, -nt, -wpw4, flavTransf24) for n in 1:21]
+        V31 = @MVector [Vert(n, Rij, wmw3, nt, -wmw1, flavTransf31) for n in 1:21]
+        V42 = @MVector [Vert(n, Rij, -wpw4, -nt, wpw2, flavTransf42) for n in 1:21]
 
         fill!(X_sum, 0.0)
 
