@@ -34,7 +34,9 @@ This will:
 - Save profile data to `profile_data/profile_<example>_<commit>.pb.gz`
 - Open an interactive pprof viewer in your browser
 
-### Benchmarking Examples (STILL WIP)
+### Benchmarking Examples
+
+#### Full Example Benchmarks (WIP)
 
 The script `pmfrg_xyz/performance_engineering/benchmark.jl`
 works in similar way as the profiling script and:
@@ -42,9 +44,34 @@ works in similar way as the profiling script and:
 - Display min/median/mean/max execution times
 - Save results to `benchmark_data/benchmark_<example>_<commit>.txt`
 
-Note: this is now impractical because these examples 
-take still too long 
+Note: this is now impractical because these examples
+take still too long
 for their benchmark to be useful.
 
-TODO: Benchmarks would be useful for smaller functions. 
+#### getXBubble! Function Benchmarks
+
+The script `benchmark_getXBubble.jl` provides focused benchmarks for the `getXBubble!` function:
+
+```bash
+julia --project=performance_engineering performance_engineering/benchmark_getXBubble.jl
+```
+
+This script runs three types of benchmarks:
+
+1. **Regression test data**: Uses real data from the test suite
+2. **Synthetic dimer data**: Parametrized by `N` (frequency discretization)
+   - Default: `N=8`
+   - Modify in script to test different values
+3. **Synthetic square lattice data**: Parametrized by `N` and `lattice_size`
+   - Default: `N=10`, `lattice_size=8`
+   - Modify in script to test different system sizes
+
+Each benchmark provides:
+- Timing distribution (min/median/mean/max)
+- Memory usage and allocation counts
+- Visual histogram of execution times
+
+**Creating synthetic benchmarks**: The script includes helper functions to generate test data:
+- `create_synthetic_workspace_dimer(N)`: Creates dimer system workspace
+- `create_synthetic_workspace_square(N, lattice_size)`: Creates square lattice workspace 
 
