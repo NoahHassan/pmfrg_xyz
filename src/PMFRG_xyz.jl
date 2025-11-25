@@ -632,57 +632,49 @@ function getXBubble!(Workspace, T::Real)
     (; N, lenIntw) = Par.NumericalParams
     (; NUnique) = Par.System
 	 
-	iGx(x, nw) = iG_(Workspace.State.iSigma.x, x, nw, T)
-    iGy(x, nw) = iG_(Workspace.State.iSigma.y, x, nw, T)
-    iGz(x, nw) = iG_(Workspace.State.iSigma.z, x, nw, T)
+    iG = SVector{3}(let iSigma = Workspace.State.iSigma
+        [(x, nw) -> iG_(iSigma_i, x, nw, T)
+         for iSigma_i in (iSigma.x, iSigma.y, iSigma.z)]
+    end)
 
-	iSKatx(x,nw) = iSKat_(Workspace.State.iSigma.x, Workspace.Deriv.iSigma.x, x, nw, T)
-	iSKaty(x,nw) = iSKat_(Workspace.State.iSigma.y, Workspace.Deriv.iSigma.y, x, nw, T)
-	iSKatz(x,nw) = iSKat_(Workspace.State.iSigma.z, Workspace.Deriv.iSigma.z, x, nw, T)
+    iSKat = SVector{3}(let iSigma = Workspace.State.iSigma, DiSigma = Workspace.Deriv.iSigma
+        [(x, nw) -> iSKat_(iSigma_i, DeriviSigma_i, x, nw, T)
+         for (iSigma_i, DeriviSigma_i) in zip((iSigma.x,iSigma.y,iSigma.z),
+                                              (DiSigma.x,DiSigma.y,DiSigma.z))]
+    end)
 
-	function getKataninPropY!(nw1,nw2)
-        BubbleProp = zeros(3, 3, Par.System.NUnique, Par.System.NUnique)
-		for i in 1:Par.System.NUnique, j in 1:Par.System.NUnique
-            ### Relative minus sign between paper & Nils' thesis
-			BubbleProp[ 1, 1,i, j] = - iSKatx(i, nw1) * iGx(j, nw2)
-			BubbleProp[ 1, 2,i, j] = - iSKatx(i, nw1) * iGy(j, nw2)
-			BubbleProp[ 1, 3,i, j] = - iSKatx(i, nw1) * iGz(j, nw2)
-			BubbleProp[ 2, 1,i, j] = - iSKaty(i, nw1) * iGx(j, nw2)
-			BubbleProp[ 2, 2,i, j] = - iSKaty(i, nw1) * iGy(j, nw2)
-			BubbleProp[ 2, 3,i, j] = - iSKaty(i, nw1) * iGz(j, nw2)
-			BubbleProp[ 3, 1,i, j] = - iSKatz(i, nw1) * iGx(j, nw2)
-			BubbleProp[ 3, 2,i, j] = - iSKatz(i, nw1) * iGy(j, nw2)
-			BubbleProp[ 3, 3,i, j] = - iSKatz(i, nw1) * iGz(j, nw2)
-		end
-
+    function getKataninPropY!(nw1, nw2)
+        BubbleProp = zeros(3, 3, NUnique, NUnique)
+        for Rij_1 in 1:NUnique, Rij_2 in 1:NUnique
+            for j in 1:3
+                for i in 1:3
+                    ### Relative minus sign between paper & Nils' thesis
+                    BubbleProp[i, j, Rij_1, Rij_2] = -iSKat[i](Rij_1, nw1) * iG[j](Rij_2, nw2)
+                end
+            end
+        end
         return BubbleProp
-		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
-	end
+    end
 
-	function getKataninPropX!(nw1,nw2)
-        BubbleProp = zeros(3, 3, Par.System.NUnique)
-        
-		for i in 1:Par.System.NUnique
-            ### Relative minus sign between paper & Nils' thesis
-			BubbleProp[ 1, 1,i] = -iSKatx(i, nw1) * iGx(i, nw2)
-			BubbleProp[ 1, 2,i] = -iSKatx(i, nw1) * iGy(i, nw2)
-			BubbleProp[ 1, 3,i] = -iSKatx(i, nw1) * iGz(i, nw2)
-			BubbleProp[ 2, 1,i] = -iSKaty(i, nw1) * iGx(i, nw2)
-			BubbleProp[ 2, 2,i] = -iSKaty(i, nw1) * iGy(i, nw2)
-			BubbleProp[ 2, 3,i] = -iSKaty(i, nw1) * iGz(i, nw2)
-			BubbleProp[ 3, 1,i] = -iSKatz(i, nw1) * iGx(i, nw2)
-			BubbleProp[ 3, 2,i] = -iSKatz(i, nw1) * iGy(i, nw2)
-			BubbleProp[ 3, 3,i] = -iSKatz(i, nw1) * iGz(i, nw2)
-		end
+    function getKataninPropX!(nw1, nw2)
+        BubbleProp = zeros(3, 3, NUnique)
+
+        for Rij in 1:Par.System.NUnique
+            for j in 1:3
+                for i in 1:3
+                    ### Relative minus sign between paper & Nils' thesis
+                    BubbleProp[i, j, Rij] = -iSKat[i](Rij, nw1) * iG[j](Rij, nw2)
+                end
+            end
+        end
 
         return SArray{Tuple{3,3,NUnique}}(BubbleProp)
-	end
+    end
 
 
 
 
 	Threads.@threads :static for (is,it)  in collect( (is,it) for is in 1:N, it in 1:N)
-        BubbleProp = zeros(NUnique, NUnique, 3, 3)
         ns = is - 1
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
