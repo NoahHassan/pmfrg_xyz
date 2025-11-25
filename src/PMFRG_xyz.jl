@@ -641,7 +641,7 @@ function getXBubble!(Workspace, T::Real)
 	iSKatz(x,nw) = iSKat_(Workspace.State.iSigma.z, Workspace.Deriv.iSigma.z, x, nw, T)
 
 	function getKataninPropY!(nw1,nw2)
-        BubbleProp = zeros(3, 3, 1:Par.System.NUnique, 1:Par.System.NUnique)
+        BubbleProp = zeros(3, 3, Par.System.NUnique, Par.System.NUnique)
 		for i in 1:Par.System.NUnique, j in 1:Par.System.NUnique
             ### Relative minus sign between paper & Nils' thesis
 			BubbleProp[ 1, 1,i, j] = - iSKatx(i, nw1) * iGx(j, nw2)
@@ -660,7 +660,7 @@ function getXBubble!(Workspace, T::Real)
 	end
 
 	function getKataninPropX!(nw1,nw2)
-        BubbleProp = zeros(3, 3, 1:Par.System.NUnique)
+        BubbleProp = zeros(3, 3, Par.System.NUnique)
         
 		for i in 1:Par.System.NUnique
             ### Relative minus sign between paper & Nils' thesis
