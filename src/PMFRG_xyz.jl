@@ -413,11 +413,11 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         # For some reason promoting P_ and PT_ to SMatrix objects
         # reduces performance slightly
         function P_(n::Int, m::Int)
-            return Props[xi, xj, n, m]
+            return Props[ n, m, xi, xj]
         end
 
         function PT_(n::Int, m::Int)
-            return Props[xj, xi, m, n]
+            return Props[ m, n, xj, xi]
         end
 
         for n in 1:21
@@ -640,26 +640,27 @@ function getXBubble!(Workspace, T::Real)
 	iSKaty(x,nw) = iSKat_(Workspace.State.iSigma.y, Workspace.Deriv.iSigma.y, x, nw, T)
 	iSKatz(x,nw) = iSKat_(Workspace.State.iSigma.z, Workspace.Deriv.iSigma.z, x, nw, T)
 
-	function getKataninProp!(BubbleProp,nw1,nw2)
+	function getKataninPropY!(nw1,nw2)
+        BubbleProp = zeros(3, 3, 1:Par.System.NUnique, 1:Par.System.NUnique)
 		for i in 1:Par.System.NUnique, j in 1:Par.System.NUnique
-			BubbleProp[i, j, 1, 1] = iSKatx(i, nw1) * iGx(j, nw2)
-			BubbleProp[i, j, 1, 2] = iSKatx(i, nw1) * iGy(j, nw2)
-			BubbleProp[i, j, 1, 3] = iSKatx(i, nw1) * iGz(j, nw2)
-			BubbleProp[i, j, 2, 1] = iSKaty(i, nw1) * iGx(j, nw2)
-			BubbleProp[i, j, 2, 2] = iSKaty(i, nw1) * iGy(j, nw2)
-			BubbleProp[i, j, 2, 3] = iSKaty(i, nw1) * iGz(j, nw2)
-			BubbleProp[i, j, 3, 1] = iSKatz(i, nw1) * iGx(j, nw2)
-			BubbleProp[i, j, 3, 2] = iSKatz(i, nw1) * iGy(j, nw2)
-			BubbleProp[i, j, 3, 3] = iSKatz(i, nw1) * iGz(j, nw2)
+            ### Relative minus sign between paper & Nils' thesis
+			BubbleProp[ 1, 1,i, j] = - iSKatx(i, nw1) * iGx(j, nw2)
+			BubbleProp[ 1, 2,i, j] = - iSKatx(i, nw1) * iGy(j, nw2)
+			BubbleProp[ 1, 3,i, j] = - iSKatx(i, nw1) * iGz(j, nw2)
+			BubbleProp[ 2, 1,i, j] = - iSKaty(i, nw1) * iGx(j, nw2)
+			BubbleProp[ 2, 2,i, j] = - iSKaty(i, nw1) * iGy(j, nw2)
+			BubbleProp[ 2, 3,i, j] = - iSKaty(i, nw1) * iGz(j, nw2)
+			BubbleProp[ 3, 1,i, j] = - iSKatz(i, nw1) * iGx(j, nw2)
+			BubbleProp[ 3, 2,i, j] = - iSKatz(i, nw1) * iGy(j, nw2)
+			BubbleProp[ 3, 3,i, j] = - iSKatz(i, nw1) * iGz(j, nw2)
 		end
 
-        ### Relative minus sign between paper & Nils' thesis
-        return -BubbleProp
+        return BubbleProp
 		# return SMatrix{NUnique, NUnique, 3, 3}(BubbleProp)
 	end
 
 	function getKataninPropX!(nw1,nw2)
-        BubbleProp = zeros(3, 3, NUnique)
+        BubbleProp = zeros(3, 3, 1:Par.System.NUnique)
         
 		for i in 1:Par.System.NUnique
             ### Relative minus sign between paper & Nils' thesis
@@ -686,7 +687,7 @@ function getXBubble!(Workspace, T::Real)
         nt = it - 1
         for nw in -lenIntw:lenIntw-1 # Matsubara sum
             spropX = getKataninPropX!(nw,nw+ns)
-            spropY = getKataninProp!(BubbleProp,nw,nw-nt)
+            spropY = getKataninPropY!(nw,nw-nt)
             for iu in 1:N
                 nu = iu - 1
                 if (ns+nt+nu)%2 == 0	# skip unphysical bosonic frequency combinations
