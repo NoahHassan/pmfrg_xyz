@@ -2,7 +2,7 @@
 
 julia_version = "1.10.6"
 manifest_format = "2.0"
-project_hash = "302ae594fb79d5dc25bf7efaf395e559bf251911"
+project_hash = "b49a5920d332ed39e2421a13a216979c33f568d4"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "8be2ae325471fc20b11c27bb34b518541d07dd3a"
@@ -1135,6 +1135,12 @@ git-tree-sha1 = "185578fa7c38119d4318326f9375f1cba0f0ce53"
 uuid = "79d7bb75-1356-48c1-b8c0-6832512096c2"
 version = "1.6.0"
 
+[[deps.PMFRG_xyz]]
+deps = ["DiffEqCallbacks", "JLD2", "LinearAlgebra", "OrdinaryDiffEq", "RecursiveArrayTools", "SparseArrays", "SpinFRGLattices", "StructArrays"]
+path = ".."
+uuid = "785b06fc-d355-4226-8a27-57b35e93bce2"
+version = "0.1.0"
+
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
 git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
@@ -1321,9 +1327,9 @@ version = "1.5.0"
 
 [[deps.SciMLOperators]]
 deps = ["Accessors", "ArrayInterface", "DocStringExtensions", "LinearAlgebra", "MacroTools"]
-git-tree-sha1 = "b6ee4912611684e08b09e4aec55bc7d8590556bb"
+git-tree-sha1 = "a1e12aee1eb7e6f957e8483eeebf9a98f3e135d6"
 uuid = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
-version = "1.12.0"
+version = "1.13.0"
 weakdeps = ["SparseArrays", "StaticArraysCore"]
 
     [deps.SciMLOperators.extensions]
@@ -1416,9 +1422,9 @@ weakdeps = ["ChainRulesCore"]
 
 [[deps.SpinFRGLattices]]
 deps = ["StaticArrays", "StructArrays", "Test"]
-git-tree-sha1 = "e207c7f140a69eb229efe42e5c51d8383553d7e0"
+path = "../../SpinFRGLattices.jl"
 uuid = "053fb7f8-31b7-4f68-aef8-4452b415dd8c"
-version = "0.5.4"
+version = "0.5.5"
 
 [[deps.Static]]
 deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools", "SciMLPublic"]

@@ -1,12 +1,8 @@
 using Pkg
-Pkg.activate(".")
-include("Tpmfrg_xyz.jl")
-import .Tpmfrg_xyz
+Pkg.activate(@__DIR__)
 
-using JLD2
-using SpinFRGLattices, OrdinaryDiffEq, DiffEqCallbacks, RecursiveArrayTools, StructArrays
-using SpinFRGLattices.StaticArrays
 using SpinFRGLattices.SquareLattice
+import PMFRG_xyz: Params, SolveFRG
 
 J1 = 1.0
 J2 = 0.5
@@ -18,7 +14,7 @@ for n in 1:System.Npairs
     isotropy[n, :] = [1.0, 0.5, 0.2]
 end
 
-Par = Tpmfrg_xyz.Params(
+Par = Params(
     System,
     N = 8,
     accuracy = 1e-10,
@@ -26,4 +22,5 @@ Par = Tpmfrg_xyz.Params(
     temp_min = 1.0
 )
 
-Tpmfrg_xyz.SolveFRG(Par, isotropy, method=DP5())
+@time results = SolveFRG(Par, isotropy)
+
