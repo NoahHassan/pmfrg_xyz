@@ -1,4 +1,5 @@
 using Pkg
+using Test
 
 include("../src/PMFRG_general.jl")
 using .PMFRG_general
@@ -158,16 +159,31 @@ X_xyz = load_object("X_xyz_test.jld2")
 
 X_gen[5, :, :, :, :] .- X_xyz[ConvertToXYZIndex(5), :, :, :, :]
 
+X_xyz_from_general = similar(X_xyz)
+X_xyz_from_general .= 0.0
+
 for n = 1:81
     index = ConvertToXYZIndex(n)
     if (index != -1)
         for m = 1:2, ns = 1:4, nt = 1:4, nu = 1:4
-            if (X_gen[n, m, ns, nt, nu] - X_xyz[index, m, ns, nt, nu] != 0)
-                println(X_gen[n, m, ns, nt, nu] - X_xyz[index, m, ns, nt, nu])
+            X_xyz_from_general[index, m, ns, nt, nu] = X_gen[n, m, ns, nt, nu]
+
+            if abs(X_gen[n, m, ns, nt, nu] - X_xyz[index, m, ns, nt, nu] > 1.0e-14)
+                println("diff (X): ", X_gen[n, m, ns, nt, nu] - X_xyz[index, m, ns, nt, nu])
             end
+
+            if abs(X_gen[n+81, m, ns, nt, nu] - X_xyz[index+21, m, ns, nt, nu] > 1.0e-14)
+                println(
+                    "diff (Y): ",
+                    X_gen[n+81, m, ns, nt, nu] - X_xyz[index+21, m, ns, nt, nu],
+                )
+            end
+
         end
     end
 end
+
+@test sum((X_xyz_from_general .- X_xyz) .^ 2) < 1.0e-10
 
 A = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 reshape(A, 3, 3)'
