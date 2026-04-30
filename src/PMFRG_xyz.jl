@@ -197,6 +197,14 @@ end
 # Transformations of flavors only transform within those blocks.
 function ConvertFreqArgs(ns, nt, nu, Nw)
     ns, nt, nu = abs.((ns, nt, nu))
+    # We need to output from this function
+    # values that can be used as indices in Gamma.
+    # so they need to be 0 < x <= Nw.
+    # 
+    # This is not enough: we need to have the same "parity",
+    # meaning that if ns is even (odd),
+    # the output for ns needs to be even (odd) too.
+
 
     ns = min(ns, Nw - 1 - (ns + Nw - 1) % 2)
     nt = min(nt, Nw - 1 - (nt + Nw - 1) % 2)
@@ -412,8 +420,16 @@ function addX!(
 
         wpw1, wpw2, _, _, _, _, wmw3, wmw4 = mixedFrequencies(ns, nt, nu, nwpr)
 
-        flavTransf12 = (get_w(wpw1) * get_w(-wpw2) < 0, get_w(ns) * get_w(-wpw2) < 0, get_w(ns) * get_w(wpw1) < 0)
-        flavTransf34 = (get_w(-wmw3) * get_w(-wmw4) < 0, get_w(ns) * get_w(-wmw4) < 0, get_w(ns) * get_w(-wmw3) < 0)
+        flavTransf12 = (
+            get_w(wpw1) * get_w(-wpw2) < 0,
+            get_w(ns) * get_w(-wpw2) < 0,
+            get_w(ns) * get_w(wpw1) < 0,
+        )
+        flavTransf34 = (
+            get_w(-wmw3) * get_w(-wmw4) < 0,
+            get_w(ns) * get_w(-wmw4) < 0,
+            get_w(ns) * get_w(-wmw3) < 0,
+        )
 
         # get fields of siteSum struct as Matrices for better use of LoopVectorization
         s1, t1, u1 = ConvertFreqArgs(ns, wpw1, -wpw2, N)
@@ -666,10 +682,26 @@ function addY!(
 
         nu = iu - 1
         _, wpw2, _, wpw4, wmw1, _, wmw3, _ = mixedFrequencies(ns, nt, nu, nwpr)
-        flavTransf13 = (get_w(nt) * get_w(wmw3) < 0, get_w(-wmw1) * get_w(wmw3) < 0, get_w(-wmw1) * get_w(nt) < 0)
-        flavTransf24 = (get_w(-nt) * get_w(-wpw4) < 0, get_w(wpw2) * get_w(-wpw4) < 0, get_w(wpw2) * get_w(-nt) < 0)
-        flavTransf31 = (get_w(nt) * get_w(-wmw1) < 0, get_w(wmw3) * get_w(-wmw1) < 0, get_w(wmw3) * get_w(nt) < 0)
-        flavTransf42 = (get_w(-nt) * get_w(wpw2) < 0, get_w(-wpw4) * get_w(wpw2) < 0, get_w(-wpw4) * get_w(-nt) < 0)
+        flavTransf13 = (
+            get_w(nt) * get_w(wmw3) < 0,
+            get_w(-wmw1) * get_w(wmw3) < 0,
+            get_w(-wmw1) * get_w(nt) < 0,
+        )
+        flavTransf24 = (
+            get_w(-nt) * get_w(-wpw4) < 0,
+            get_w(wpw2) * get_w(-wpw4) < 0,
+            get_w(wpw2) * get_w(-nt) < 0,
+        )
+        flavTransf31 = (
+            get_w(nt) * get_w(-wmw1) < 0,
+            get_w(wmw3) * get_w(-wmw1) < 0,
+            get_w(wmw3) * get_w(nt) < 0,
+        )
+        flavTransf42 = (
+            get_w(-nt) * get_w(wpw2) < 0,
+            get_w(-wpw4) * get_w(wpw2) < 0,
+            get_w(-wpw4) * get_w(-nt) < 0,
+        )
 
 
         V13 = V13_addY
@@ -1228,7 +1260,11 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
                 wmw1 = nw - nw1
                 for k_spl = 1:Nsum[Rx]
                     (; m, ki, xk) = siteSum[k_spl, Rx]
-                    flavTransform = (get_w(-wmw1) * get_w(-wpw1) < 0, get_w(-wpw1) < 0, get_w(-wmw1) < 0)
+                    flavTransform = (
+                        get_w(-wmw1) * get_w(-wpw1) < 0,
+                        get_w(-wpw1) < 0,
+                        get_w(-wmw1) < 0,
+                    )
                     gam = @SVector [
                         Gamma_(n, ki, 0, -wmw1, -wpw1, flavTransform) for n = 1:21
                     ]
@@ -1386,22 +1422,26 @@ function launchPMFRG!(
     return sol, saved_values
 end
 
-SolveFRG(Par, anisotropy; kwargs...) =
-    launchPMFRG!(InitializeState(Par, anisotropy),
+SolveFRG(Par, anisotropy; kwargs...) = launchPMFRG!(
+    InitializeState(Par, anisotropy),
     AllocateSetup(Par),
     getDeriv!,
     SavedValues(_getFloatType(Par), Observables{_getFloatType(Par)}),
-    (State, t, _) -> save_static_chis(State, t, Par); kwargs...)
+    (State, t, _) -> save_static_chis(State, t, Par);
+    kwargs...,
+)
 
-SolveFRG(Par, anisotropy, saved_values, save_func; kwargs...) =
-    launchPMFRG!(InitializeState(Par, anisotropy),
+SolveFRG(Par, anisotropy, saved_values, save_func; kwargs...) = launchPMFRG!(
+    InitializeState(Par, anisotropy),
     AllocateSetup(Par),
     getDeriv!,
     saved_values,
     save_func;
-    kwargs...)
+    kwargs...,
+)
 
-TestFRG(Par, isotropy; kwargs...) = testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!; kwargs...)
+TestFRG(Par, isotropy; kwargs...) =
+    testPMFRG!(InitializeState(Par, isotropy), AllocateSetup(Par), getDeriv!; kwargs...)
 
 function get_t_min(Lam)
     Lam < exp(-30) && @warn "temp_min too small! Set to exp(-30) instead."
@@ -1440,8 +1480,8 @@ function setToBareVertex!(
         Gamma[fd.yx3, Rj, :, :, :] .= couplings[Rj] * anisotropy[Rj, 3]
     end
 
-    for n in 1:21
-        if(abs(Gamma[n, 2, 1, 1, 1]) > 0.0)
+    for n = 1:21
+        if (abs(Gamma[n, 2, 1, 1, 1]) > 0.0)
             println("$n: $(Gamma[n, 2, 1, 1, 1])")
         end
     end
@@ -1466,40 +1506,41 @@ getChi_x(State::ArrayPartition, T::Real, Par) =
     getChi_x(State.x[3], State.x[4], State.x[5], T, Par)
 getChi_y(State::ArrayPartition, T::Real, Par) =
     getChi_y(State.x[4], State.x[2], State.x[5], T, Par)
-    
-function getChi_z(
-        iSigmaX::AbstractArray,
-        iSigmaY::AbstractArray,
-        Gamma::AbstractArray,
-        T::Real,
-        Par,
-    )
-        (; N, lenIntw_acc) = Par.NumericalParams
-        (; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
-    
-        iGx(x, w) = iG_(iSigmaX, x, w, T)
-        iGy(x, w) = iG_(iSigmaY, x, w, T)
-        Vxy2(Rij, s, t, u, isFlavorTransform) =
-            V_(Gamma, fd.xy2, s, t, u, isFlavorTransform, Rij, invpairs[Rij], N)
-    
-        Chi = zeros(_getFloatType(Par), Npairs)
-    
-        for Rij = 1:Npairs
-            (; xi, xj) = PairTypes[Rij]
-            for nK = -lenIntw_acc:lenIntw_acc-1
-                if Rij in OnsitePairs
-                    Chi[Rij, 1] += iGx(xi, nK) * iGy(xi, nK)
-                end
-                for nK2 = -lenIntw_acc:lenIntw_acc-1
-                    npwpw2 = nK + nK2 + 1
-                    w2mw = nK2 - nK
-                    GGGG = iGx(xi, nK)^2 * iGy(xj, nK2)^2
-                    flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
 
-                    Chi[Rij] += GGGG * Vxy2(Rij, 0, npwpw2, -w2mw, flavTransform)
-                end
+function getChi_z(
+    iSigmaX::AbstractArray,
+    iSigmaY::AbstractArray,
+    Gamma::AbstractArray,
+    T::Real,
+    Par,
+)
+    (; N, lenIntw_acc) = Par.NumericalParams
+    (; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
+
+    iGx(x, w) = iG_(iSigmaX, x, w, T)
+    iGy(x, w) = iG_(iSigmaY, x, w, T)
+    Vxy2(Rij, s, t, u, isFlavorTransform) =
+        V_(Gamma, fd.xy2, s, t, u, isFlavorTransform, Rij, invpairs[Rij], N)
+
+    Chi = zeros(_getFloatType(Par), Npairs)
+
+    for Rij = 1:Npairs
+        (; xi, xj) = PairTypes[Rij]
+        for nK = -lenIntw_acc:lenIntw_acc-1
+            if Rij in OnsitePairs
+                Chi[Rij, 1] += iGx(xi, nK) * iGy(xi, nK)
+            end
+            for nK2 = -lenIntw_acc:lenIntw_acc-1
+                npwpw2 = nK + nK2 + 1
+                w2mw = nK2 - nK
+                GGGG = iGx(xi, nK)^2 * iGy(xj, nK2)^2
+                flavTransform =
+                    (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+
+                Chi[Rij] += GGGG * Vxy2(Rij, 0, npwpw2, -w2mw, flavTransform)
             end
         end
+    end
     return (Chi)
 end
 
@@ -1509,7 +1550,7 @@ function getChi_z(
     Gamma::AbstractArray,
     T::Real,
     Par,
-    Numax::Real
+    Numax::Real,
 )
     (; N, lenIntw_acc) = Par.NumericalParams
     (; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
@@ -1524,7 +1565,7 @@ function getChi_z(
     for Rij = 1:Npairs
         for i_nu = 1:Numax
             n_nu = i_nu - 1
-        
+
             (; xi, xj) = PairTypes[Rij]
             for nK = -lenIntw_acc:lenIntw_acc-1
                 if Rij in OnsitePairs
@@ -1533,12 +1574,20 @@ function getChi_z(
                 for nK2 = -lenIntw_acc:lenIntw_acc-1
                     npwpw2 = n_nu + nK + nK2 + 1
                     w2mw = nK2 - nK
-                    GGGG = iGx(xi, nK) * iGx(xi, nK + n_nu) * iGy(xj, nK2) * iGy(xj, nK2 + n_nu)
-                    flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+                    GGGG =
+                        iGx(xi, nK) *
+                        iGx(xi, nK + n_nu) *
+                        iGy(xj, nK2) *
+                        iGy(xj, nK2 + n_nu)
+                    flavTransform = (
+                        get_w(npwpw2) * get_w(-w2mw) < 0,
+                        get_w(-w2mw) < 0,
+                        get_w(npwpw2) < 0,
+                    )
 
                     val = Vxy2(Rij, n_nu, npwpw2, -w2mw, flavTransform)
 
-                    if(abs(val) > 0.0)
+                    if (abs(val) > 0.0)
                         Chi[Rij, i_nu] += GGGG# * Vxy2(Rij, n_nu, npwpw2, -w2mw, flavTransform) ####### hier denken
                     end
                 end
@@ -1575,7 +1624,8 @@ function getChi_x(
                 npwpw2 = nK + nK2 + 1
                 w2mw = nK2 - nK
                 GGGG = iGy(xi, nK)^2 * iGz(xj, nK2)^2
-                flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+                flavTransform =
+                    (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
                 Chi[Rij] += GGGG * Vyz2(Rij, 0, npwpw2, -w2mw, flavTransform)
             end
         end
@@ -1589,7 +1639,7 @@ function getChi_x(
     Gamma::AbstractArray,
     T::Real,
     Par,
-    Numax::Real
+    Numax::Real,
 )
     (; N, lenIntw_acc) = Par.NumericalParams
     (; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
@@ -1604,7 +1654,7 @@ function getChi_x(
     for Rij = 1:Npairs
         for i_nu = 1:Numax
             n_nu = i_nu - 1
-        
+
             (; xi, xj) = PairTypes[Rij]
             for nK = -lenIntw_acc:lenIntw_acc-1
                 if Rij in OnsitePairs
@@ -1613,8 +1663,16 @@ function getChi_x(
                 for nK2 = -lenIntw_acc:lenIntw_acc-1
                     npwpw2 = n_nu + nK + nK2 + 1
                     w2mw = nK2 - nK
-                    GGGG = iGy(xi, nK) * iGy(xi, nK + n_nu) * iGz(xj, nK2) * iGz(xj, nK2 + n_nu)
-                    flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+                    GGGG =
+                        iGy(xi, nK) *
+                        iGy(xi, nK + n_nu) *
+                        iGz(xj, nK2) *
+                        iGz(xj, nK2 + n_nu)
+                    flavTransform = (
+                        get_w(npwpw2) * get_w(-w2mw) < 0,
+                        get_w(-w2mw) < 0,
+                        get_w(npwpw2) < 0,
+                    )
                     Chi[Rij, i_nu] += GGGG * Vyz2(Rij, n_nu, npwpw2, -w2mw, flavTransform) ####### hier denken
                 end
             end
@@ -1650,7 +1708,8 @@ function getChi_y(
                 npwpw2 = nK + nK2 + 1
                 w2mw = nK2 - nK
                 GGGG = iGz(xi, nK)^2 * iGx(xj, nK2)^2
-                flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+                flavTransform =
+                    (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
                 Chi[Rij] += GGGG * Vzx2(Rij, 0, npwpw2, -w2mw, flavTransform)
             end
         end
@@ -1664,7 +1723,7 @@ function getChi_y(
     Gamma::AbstractArray,
     T::Real,
     Par,
-    Numax::Real
+    Numax::Real,
 )
     (; N, lenIntw_acc) = Par.NumericalParams
     (; Npairs, invpairs, PairTypes, OnsitePairs) = Par.System
@@ -1679,7 +1738,7 @@ function getChi_y(
     for Rij = 1:Npairs
         for i_nu = 1:Numax
             n_nu = i_nu - 1
-        
+
             (; xi, xj) = PairTypes[Rij]
             for nK = -lenIntw_acc:lenIntw_acc-1
                 if Rij in OnsitePairs
@@ -1688,8 +1747,16 @@ function getChi_y(
                 for nK2 = -lenIntw_acc:lenIntw_acc-1
                     npwpw2 = n_nu + nK + nK2 + 1
                     w2mw = nK2 - nK
-                    GGGG = iGz(xi, nK) * iGz(xi, nK + n_nu) * iGx(xj, nK2) * iGx(xj, nK2 + n_nu)
-                    flavTransform = (get_w(npwpw2) * get_w(-w2mw) < 0, get_w(-w2mw) < 0, get_w(npwpw2) < 0)
+                    GGGG =
+                        iGz(xi, nK) *
+                        iGz(xi, nK + n_nu) *
+                        iGx(xj, nK2) *
+                        iGx(xj, nK2 + n_nu)
+                    flavTransform = (
+                        get_w(npwpw2) * get_w(-w2mw) < 0,
+                        get_w(-w2mw) < 0,
+                        get_w(npwpw2) < 0,
+                    )
                     Chi[Rij, i_nu] += GGGG * Vzx2(Rij, n_nu, npwpw2, -w2mw, flavTransform) ####### hier denken
                 end
             end
