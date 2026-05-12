@@ -789,8 +789,8 @@ function addY!(
                         V13[fd.xy3] * V24[fd.xy3] * P[2, 1] +
                         V13[fd.xy1] * V24[fd.xy1] * P[1, 2]
                     ) + (
-                        V31[fd.xy3] * V42[fd.xy3] * PT[2, 1] +
-                        V31[fd.xy1] * V42[fd.xy1] * PT[1, 2]
+                        V31[fd.xy3] * V42[fd.xy3] * PT[1, 2] +
+                        V31[fd.xy1] * V42[fd.xy1] * PT[2, 1]
                     )
                 )
 
@@ -800,8 +800,8 @@ function addY!(
                         V13[fd.xz3] * V24[fd.xz3] * P[3, 1] +
                         V13[fd.xz1] * V24[fd.xz1] * P[1, 3]
                     ) + (
-                        V31[fd.xz3] * V42[fd.xz3] * PT[3, 1] +
-                        V31[fd.xz1] * V42[fd.xz1] * PT[1, 3]
+                        V31[fd.xz3] * V42[fd.xz3] * PT[1, 3] +
+                        V31[fd.xz1] * V42[fd.xz1] * PT[3, 1]
                     )
                 )
 
@@ -811,8 +811,8 @@ function addY!(
                         V13[fd.yx3] * V24[fd.yx3] * P[1, 2] +
                         V13[fd.yx1] * V24[fd.yx1] * P[2, 1]
                     ) + (
-                        V31[fd.yx3] * V42[fd.yx3] * PT[1, 2] +
-                        V31[fd.yx1] * V42[fd.yx1] * PT[2, 1]
+                        V31[fd.yx3] * V42[fd.yx3] * PT[2, 1] +
+                        V31[fd.yx1] * V42[fd.yx1] * PT[1, 2]
                     )
                 )
 
@@ -822,8 +822,8 @@ function addY!(
                         V13[fd.yz3] * V24[fd.yz3] * P[3, 2] +
                         V13[fd.yz1] * V24[fd.yz1] * P[2, 3]
                     ) + (
-                        V31[fd.yz3] * V42[fd.yz3] * PT[3, 2] +
-                        V31[fd.yz1] * V42[fd.yz1] * PT[2, 3]
+                        V31[fd.yz3] * V42[fd.yz3] * PT[2, 3] +
+                        V31[fd.yz1] * V42[fd.yz1] * PT[3, 2]
                     )
                 )
 
@@ -833,8 +833,8 @@ function addY!(
                         V13[fd.zx3] * V24[fd.zx3] * P[1, 3] +
                         V13[fd.zx1] * V24[fd.zx1] * P[3, 1]
                     ) + (
-                        V31[fd.zx3] * V42[fd.zx3] * PT[1, 3] +
-                        V31[fd.zx1] * V42[fd.zx1] * PT[3, 1]
+                        V31[fd.zx3] * V42[fd.zx3] * PT[3, 1] +
+                        V31[fd.zx1] * V42[fd.zx1] * PT[1, 3]
                     )
                 )
 
@@ -844,12 +844,13 @@ function addY!(
                         V13[fd.zy3] * V24[fd.zy3] * P[2, 3] +
                         V13[fd.zy1] * V24[fd.zy1] * P[3, 2]
                     ) + (
-                        V31[fd.zy3] * V42[fd.zy3] * PT[2, 3] +
-                        V31[fd.zy1] * V42[fd.zy1] * PT[3, 2]
+                        V31[fd.zy3] * V42[fd.zy3] * PT[3, 2] +
+                        V31[fd.zy1] * V42[fd.zy1] * PT[2, 3]
                     )
                 )
 
             ### Yab2 = Vaa Vba2 + Vab2 Vbb + Vac2 Vbc2 + (w -- -w + t)
+
             X_sum_addY[iuh_local, fd.xy2, Rij] =
                 X_sum_addY[iuh_local, fd.xy2, Rij] + (
                     (
@@ -929,14 +930,15 @@ function addY!(
                 )
 
             ### Yab3 = Vab3 Vba1 + Vab1 Vba3 + (w -- -w + t)
+
             X_sum_addY[iuh_local, fd.xy3, Rij] =
                 X_sum_addY[iuh_local, fd.xy3, Rij] + (
                     (
                         V13[fd.xy3] * V24[fd.yx1] * P[2, 1] +
                         V13[fd.xy1] * V24[fd.yx3] * P[1, 2]
                     ) + (
-                        V31[fd.xy3] * V42[fd.yx1] * PT[2, 1] +
-                        V31[fd.xy1] * V42[fd.yx3] * PT[1, 2]
+                        V31[fd.xy3] * V42[fd.yx1] * PT[1, 2] +
+                        V31[fd.xy1] * V42[fd.yx3] * PT[2, 1]
                     )
                 )
 
@@ -946,8 +948,8 @@ function addY!(
                         V13[fd.xz3] * V24[fd.zx1] * P[3, 1] +
                         V13[fd.xz1] * V24[fd.zx3] * P[1, 3]
                     ) + (
-                        V31[fd.xz3] * V42[fd.zx1] * PT[3, 1] +
-                        V31[fd.xz1] * V42[fd.zx3] * PT[1, 3]
+                        V31[fd.xz3] * V42[fd.zx1] * PT[1, 3] +
+                        V31[fd.xz1] * V42[fd.zx3] * PT[3, 1]
                     )
                 )
 
@@ -957,8 +959,8 @@ function addY!(
                         V13[fd.yx3] * V24[fd.xy1] * P[1, 2] +
                         V13[fd.yx1] * V24[fd.xy3] * P[2, 1]
                     ) + (
-                        V31[fd.yx3] * V42[fd.xy1] * PT[1, 2] +
-                        V31[fd.yx1] * V42[fd.xy3] * PT[2, 1]
+                        V31[fd.yx3] * V42[fd.xy1] * PT[2, 1] +
+                        V31[fd.yx1] * V42[fd.xy3] * PT[1, 2]
                     )
                 )
 
@@ -968,8 +970,8 @@ function addY!(
                         V13[fd.yz3] * V24[fd.zy1] * P[3, 2] +
                         V13[fd.yz1] * V24[fd.zy3] * P[2, 3]
                     ) + (
-                        V31[fd.yz3] * V42[fd.zy1] * PT[3, 2] +
-                        V31[fd.yz1] * V42[fd.zy3] * PT[2, 3]
+                        V31[fd.yz3] * V42[fd.zy1] * PT[2, 3] +
+                        V31[fd.yz1] * V42[fd.zy3] * PT[3, 2]
                     )
                 )
 
@@ -979,8 +981,8 @@ function addY!(
                         V13[fd.zx3] * V24[fd.xz1] * P[1, 3] +
                         V13[fd.zx1] * V24[fd.xz3] * P[3, 1]
                     ) + (
-                        V31[fd.zx3] * V42[fd.xz1] * PT[1, 3] +
-                        V31[fd.zx1] * V42[fd.xz3] * PT[3, 1]
+                        V31[fd.zx3] * V42[fd.xz1] * PT[3, 1] +
+                        V31[fd.zx1] * V42[fd.xz3] * PT[1, 3]
                     )
                 )
 
@@ -990,8 +992,8 @@ function addY!(
                         V13[fd.zy3] * V24[fd.yz1] * P[2, 3] +
                         V13[fd.zy1] * V24[fd.yz3] * P[3, 2]
                     ) + (
-                        V31[fd.zy3] * V42[fd.yz1] * PT[2, 3] +
-                        V31[fd.zy1] * V42[fd.yz3] * PT[3, 2]
+                        V31[fd.zy3] * V42[fd.yz1] * PT[3, 2] +
+                        V31[fd.zy1] * V42[fd.yz3] * PT[2, 3]
                     )
                 )
 
@@ -1359,10 +1361,6 @@ function InitializeState(Par, anisotropy)
 
     setToBareVertex!(Gamma, couplings, anisotropy)
 
-    println(getChi_x(State, 100.0, Par))
-    println(getChi_y(State, 100.0, Par))
-    println(getChi_z(State, 100.0, Par))
-
     return State
 
 end
@@ -1377,6 +1375,7 @@ function save_static_chis(State, t, Par)
     chi_x = getChi_x(State, t_to_Lam(t), Par)
     chi_y = getChi_y(State, t_to_Lam(t), Par)
     chi_z = getChi_z(State, t_to_Lam(t), Par)
+    println("t: $(exp(t))")
     return Observables(copy(chi_x), copy(chi_y), copy(chi_z))
 end
 
@@ -1478,12 +1477,6 @@ function setToBareVertex!(
         Gamma[fd.xz3, Rj, :, :, :] .= couplings[Rj] * anisotropy[Rj, 2]
         Gamma[fd.xy3, Rj, :, :, :] .= couplings[Rj] * anisotropy[Rj, 3]
         Gamma[fd.yx3, Rj, :, :, :] .= couplings[Rj] * anisotropy[Rj, 3]
-    end
-
-    for n = 1:21
-        if (abs(Gamma[n, 2, 1, 1, 1]) > 0.0)
-            println("$n: $(Gamma[n, 2, 1, 1, 1])")
-        end
     end
 
     return Gamma
@@ -1588,7 +1581,7 @@ function getChi_z(
                     val = Vxy2(Rij, n_nu, npwpw2, -w2mw, flavTransform)
 
                     if (abs(val) > 0.0)
-                        Chi[Rij, i_nu] += GGGG# * Vxy2(Rij, n_nu, npwpw2, -w2mw, flavTransform) ####### hier denken
+                        Chi[Rij, i_nu] += GGGG * Vxy2(Rij, n_nu, npwpw2, -w2mw, flavTransform)
                     end
                 end
             end

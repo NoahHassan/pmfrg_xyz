@@ -455,7 +455,6 @@ function getXBubble!(Workspace, T::Real)
             spropX = getKataninProp!(BubbleProp, nw, nw + ns)
             spropY = getKataninProp!(BubbleProp, nw, nw - nt)
             for iu = 1:N
-                save_object("spropY/gen-$is-$it-$nw.jld2", spropY)
                 nu = iu - 1
                 if (ns + nt + nu) % 2 == 0# skip unphysical bosonic frequency combinations
                     continue
@@ -471,7 +470,6 @@ function getXBubble!(Workspace, T::Real)
             end
         end
     end
-    save_object("X_gen_test.jld2", Workspace.X)
 end
 
 function symmetrizeBubble!(X::Array{T,5}, Par) where {T}
@@ -609,11 +607,6 @@ function addTo1PartBubble!(Dgamma::Array{T,3}, Gamma_::Function, Props, Par) whe
             end
         end
     end
-    sigma = copy(Dgamma)
-    setZero!(sigma)
-    save_object("SKat_gen.jld2", [iSKat_(sigma, Dgamma, 1, b, 100) for b = 1:4])
-    save_object("G_gen.jld2", [iG_(sigma, 1, b, 100) for b = 1:4])
-    save_object("Dgamma_gen.jld2", Dgamma)
 end
 
 using JLD2

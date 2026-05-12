@@ -7,6 +7,9 @@ using .PMFRG_general
 include("../src/PMFRG_old.jl")
 using .PMFRG_old
 
+include("../src/PMFRG_xyz.jl")
+using .PMFRG_xyz
+
 _N = 4
 
 function GenIndexFromFlavors(d1::Int, d2::Int, d3::Int, d4::Int)
@@ -138,7 +141,7 @@ function test_deriv()
         accuracy = 1e-4,
     )
     Par_xyz =
-        PMFRG_old.Params(System, N = 4, temp_max = 1.0, temp_min = 10.0, accuracy = 1e-4)
+        PMFRG_old.Params(System, N = _N, temp_max = 1.0, temp_min = 10.0, accuracy = 1e-4)
 
     # Gamma_(index, ki, 0, -wmw1, -wpw1, flavTransform)
     PMFRG_general.TestFRGAt(Par_gen, zeros(System.Npairs, 3, 3), G_gen)

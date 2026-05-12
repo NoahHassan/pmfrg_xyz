@@ -533,44 +533,62 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         ### Yab1 = Vab3 Vab3 + Vab1 Vab1 + (w -- -w + t)
 
         X_sum[21+fd.xy1] += (
-            (V13[fd.xy3] * V24[fd.xy3] * P_(2, 1) + V13[fd.xy1] * V24[fd.xy1] * P_(1, 2)) + (
-                V31[fd.xy3] * V42[fd.xy3] * PT_(2, 1) +
-                V31[fd.xy1] * V42[fd.xy1] * PT_(1, 2)
+            (
+                V13[fd.xy3] * V24[fd.xy3] * P_(2, 1) +
+                V13[fd.xy1] * V24[fd.xy1] * P_(1, 2)
+            ) + (
+                V31[fd.xy3] * V42[fd.xy3] * PT_(1, 2) +
+                V31[fd.xy1] * V42[fd.xy1] * PT_(2, 1)
             )
         )
 
         X_sum[21+fd.xz1] += (
-            (V13[fd.xz3] * V24[fd.xz3] * P_(3, 1) + V13[fd.xz1] * V24[fd.xz1] * P_(1, 3)) + (
-                V31[fd.xz3] * V42[fd.xz3] * PT_(3, 1) +
-                V31[fd.xz1] * V42[fd.xz1] * PT_(1, 3)
+            (
+                V13[fd.xz3] * V24[fd.xz3] * P_(3, 1) +
+                V13[fd.xz1] * V24[fd.xz1] * P_(1, 3)
+            ) + (
+                V31[fd.xz3] * V42[fd.xz3] * PT_(1, 3) +
+                V31[fd.xz1] * V42[fd.xz1] * PT_(3, 1)
             )
         )
 
         X_sum[21+fd.yx1] += (
-            (V13[fd.yx3] * V24[fd.yx3] * P_(1, 2) + V13[fd.yx1] * V24[fd.yx1] * P_(2, 1)) + (
-                V31[fd.yx3] * V42[fd.yx3] * PT_(1, 2) +
-                V31[fd.yx1] * V42[fd.yx1] * PT_(2, 1)
+            (
+                V13[fd.yx3] * V24[fd.yx3] * P_(1, 2) +
+                V13[fd.yx1] * V24[fd.yx1] * P_(2, 1)
+            ) + (
+                V31[fd.yx3] * V42[fd.yx3] * PT_(2, 1) +
+                V31[fd.yx1] * V42[fd.yx1] * PT_(1, 2)
             )
         )
 
         X_sum[21+fd.yz1] += (
-            (V13[fd.yz3] * V24[fd.yz3] * P_(3, 2) + V13[fd.yz1] * V24[fd.yz1] * P_(2, 3)) + (
-                V31[fd.yz3] * V42[fd.yz3] * PT_(3, 2) +
-                V31[fd.yz1] * V42[fd.yz1] * PT_(2, 3)
+            (
+                V13[fd.yz3] * V24[fd.yz3] * P_(3, 2) +
+                V13[fd.yz1] * V24[fd.yz1] * P_(2, 3)
+            ) + (
+                V31[fd.yz3] * V42[fd.yz3] * PT_(2, 3) +
+                V31[fd.yz1] * V42[fd.yz1] * PT_(3, 2)
             )
         )
 
         X_sum[21+fd.zx1] += (
-            (V13[fd.zx3] * V24[fd.zx3] * P_(1, 3) + V13[fd.zx1] * V24[fd.zx1] * P_(3, 1)) + (
-                V31[fd.zx3] * V42[fd.zx3] * PT_(1, 3) +
-                V31[fd.zx1] * V42[fd.zx1] * PT_(3, 1)
+            (
+                V13[fd.zx3] * V24[fd.zx3] * P_(1, 3) +
+                V13[fd.zx1] * V24[fd.zx1] * P_(3, 1)
+            ) + (
+                V31[fd.zx3] * V42[fd.zx3] * PT_(3, 1) +
+                V31[fd.zx1] * V42[fd.zx1] * PT_(1, 3)
             )
         )
 
         X_sum[21+fd.zy1] += (
-            (V13[fd.zy3] * V24[fd.zy3] * P_(2, 3) + V13[fd.zy1] * V24[fd.zy1] * P_(3, 2)) + (
-                V31[fd.zy3] * V42[fd.zy3] * PT_(2, 3) +
-                V31[fd.zy1] * V42[fd.zy1] * PT_(3, 2)
+            (
+                V13[fd.zy3] * V24[fd.zy3] * P_(2, 3) +
+                V13[fd.zy1] * V24[fd.zy1] * P_(3, 2)
+            ) + (
+                V31[fd.zy3] * V42[fd.zy3] * PT_(3, 2) +
+                V31[fd.zy1] * V42[fd.zy1] * PT_(2, 3)
             )
         )
 
@@ -651,44 +669,62 @@ function addY!(Workspace, is::Integer, it::Integer, iu::Integer, nwpr::Integer, 
         ### Yab3 = Vab3 Vba1 + Vab1 Vba3 + (w -- -w + t)
 
         X_sum[21+fd.xy3] += (
-            (V13[fd.xy3] * V24[fd.yx1] * P_(2, 1) + V13[fd.xy1] * V24[fd.yx3] * P_(1, 2)) + (
-                V31[fd.xy3] * V42[fd.yx1] * PT_(2, 1) +
-                V31[fd.xy1] * V42[fd.yx3] * PT_(1, 2)
+            (
+                V13[fd.xy3] * V24[fd.yx1] * P_(2, 1) +
+                V13[fd.xy1] * V24[fd.yx3] * P_(1, 2)
+            ) + (
+                V31[fd.xy3] * V42[fd.yx1] * PT_(1, 2) +
+                V31[fd.xy1] * V42[fd.yx3] * PT_(2, 1)
             )
         )
 
         X_sum[21+fd.xz3] += (
-            (V13[fd.xz3] * V24[fd.zx1] * P_(3, 1) + V13[fd.xz1] * V24[fd.zx3] * P_(1, 3)) + (
-                V31[fd.xz3] * V42[fd.zx1] * PT_(3, 1) +
-                V31[fd.xz1] * V42[fd.zx3] * PT_(1, 3)
+            (
+                V13[fd.xz3] * V24[fd.zx1] * P_(3, 1) +
+                V13[fd.xz1] * V24[fd.zx3] * P_(1, 3)
+            ) + (
+                V31[fd.xz3] * V42[fd.zx1] * PT_(1, 3) +
+                V31[fd.xz1] * V42[fd.zx3] * PT_(3, 1)
             )
         )
 
         X_sum[21+fd.yx3] += (
-            (V13[fd.yx3] * V24[fd.xy1] * P_(1, 2) + V13[fd.yx1] * V24[fd.xy3] * P_(2, 1)) + (
-                V31[fd.yx3] * V42[fd.xy1] * PT_(1, 2) +
-                V31[fd.yx1] * V42[fd.xy3] * PT_(2, 1)
+            (
+                V13[fd.yx3] * V24[fd.xy1] * P_(1, 2) +
+                V13[fd.yx1] * V24[fd.xy3] * P_(2, 1)
+            ) + (
+                V31[fd.yx3] * V42[fd.xy1] * PT_(2, 1) +
+                V31[fd.yx1] * V42[fd.xy3] * PT_(1, 2)
             )
         )
 
         X_sum[21+fd.yz3] += (
-            (V13[fd.yz3] * V24[fd.zy1] * P_(3, 2) + V13[fd.yz1] * V24[fd.zy3] * P_(2, 3)) + (
-                V31[fd.yz3] * V42[fd.zy1] * PT_(3, 2) +
-                V31[fd.yz1] * V42[fd.zy3] * PT_(2, 3)
+            (
+                V13[fd.yz3] * V24[fd.zy1] * P_(3, 2) +
+                V13[fd.yz1] * V24[fd.zy3] * P_(2, 3)
+            ) + (
+                V31[fd.yz3] * V42[fd.zy1] * PT_(2, 3) +
+                V31[fd.yz1] * V42[fd.zy3] * PT_(3, 2)
             )
         )
 
         X_sum[21+fd.zx3] += (
-            (V13[fd.zx3] * V24[fd.xz1] * P_(1, 3) + V13[fd.zx1] * V24[fd.xz3] * P_(3, 1)) + (
-                V31[fd.zx3] * V42[fd.xz1] * PT_(1, 3) +
-                V31[fd.zx1] * V42[fd.xz3] * PT_(3, 1)
+            (
+                V13[fd.zx3] * V24[fd.xz1] * P_(1, 3) +
+                V13[fd.zx1] * V24[fd.xz3] * P_(3, 1)
+            ) + (
+                V31[fd.zx3] * V42[fd.xz1] * PT_(3, 1) +
+                V31[fd.zx1] * V42[fd.xz3] * PT_(1, 3)
             )
         )
 
         X_sum[21+fd.zy3] += (
-            (V13[fd.zy3] * V24[fd.yz1] * P_(2, 3) + V13[fd.zy1] * V24[fd.yz3] * P_(3, 2)) + (
-                V31[fd.zy3] * V42[fd.yz1] * PT_(2, 3) +
-                V31[fd.zy1] * V42[fd.yz3] * PT_(3, 2)
+            (
+                V13[fd.zy3] * V24[fd.yz1] * P_(2, 3) +
+                V13[fd.zy1] * V24[fd.yz3] * P_(3, 2)
+            ) + (
+                V31[fd.zy3] * V42[fd.yz1] * PT_(3, 2) +
+                V31[fd.zy1] * V42[fd.yz3] * PT_(2, 3)
             )
         )
 
@@ -735,7 +771,6 @@ function getXBubble!(Workspace, T::Real)
             spropX = getKataninProp!(BubbleProp, nw, nw + ns)
             spropY = getKataninProp!(BubbleProp, nw, nw - nt)
             for iu = 1:N
-                save_object("spropY/xyz-$is-$it-$nw.jld2", spropY)
                 nu = iu - 1
                 if (ns + nt + nu) % 2 == 0# skip unphysical bosonic frequency combinations
                     continue
@@ -751,7 +786,6 @@ function getXBubble!(Workspace, T::Real)
             end
         end
     end
-    save_object("X_xyz_test.jld2", Workspace.X)
 end
 
 function symmetrizeBubble!(X::Array{T,5}, Par) where {T}
@@ -918,15 +952,6 @@ function addTo1PartBubble!(Dgamma::SigmaType, Gamma_::Function, Props, Par)
             end
         end
     end
-    sigma = copy(Dgamma.x)
-    setZero!(sigma)
-    save_object(
-        "SKat_xyz.jld2",
-        [-iG_(sigma, 1, b, 100)^2 * iSigma_(Dgamma.x, 1, b) for b = 1:4],
-    )
-    # save_object("SKat_xyz.jld2", [iSKat_(sigma, Dgamma.x, 1, b, 100) for b in 1:4])
-    save_object("G_xyz.jld2", [iG_(sigma, 1, b, 100) for b = 1:4])
-    save_object("Dgamma_xyz.jld2", Dgamma)
 end
 
 using JLD2

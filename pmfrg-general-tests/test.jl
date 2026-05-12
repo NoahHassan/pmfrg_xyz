@@ -66,7 +66,7 @@ function run_general()
         N = 4,
         temp_max = 100.0,
         temp_min = 1.0,
-        accuracy = 1e-6,
+        accuracy = 1e-10,
     )
 
     sol, saved_values = PMFRG_general.SolveFRG(
@@ -127,7 +127,7 @@ function run_xyz()
         anisotropy[Rij, :] = [-0.2, 3.0, 1.0]
     end
 
-    Par = PMFRG_xyz.Params(System, N = 4, temp_max = 100.0, temp_min = 1.0, accuracy = 1e-6)
+    Par = PMFRG_xyz.Params(System, N = 4, temp_max = 100.0, temp_min = 1.0, accuracy = 1e-10)
 
     let
         sol, saved_values = PMFRG_xyz.SolveFRG(
@@ -150,7 +150,45 @@ function run_xyz()
 
 end
 
+function XYZIndex_from_GenIndex(n::Int)
+    if ((n - 1) % 40 == 0)
+        return div(n - 1, 40) + 1
+    end
 
+    d1, d2, d3, d4 = FlavorsFromGenIndex(n)
+    if (d1 == d2)
+        if (d3 != d4)
+            return -1
+        end
+        if (d1 == 2 && (d3 + 2) % 3 == 0)
+            return 9
+        else
+            return 3 + d1 + (d3 + 2) % 3 + 1
+        end
+    end
+    if (d1 == d3)
+        if (d2 != d4)
+            return -1
+        end
+        if (d1 == 2 && (d2 + 2) % 3 == 0)
+            return 15
+        else
+            return 9 + d1 + (d2 + 2) % 3 + 1
+        end
+    end
+    if (d1 == d4)
+        if (d2 != d3)
+            return -1
+        end
+        if (d1 == 2 && (d2 + 2) % 3 == 0)
+            return 21
+        else
+            return 15 + d1 + (d2 + 2) % 3 + 1
+        end
+    end
+
+    return -1
+end
 
 function compare_general_xyz()
     data_gen = load_object("general_[-0.2 3.0 1.0]_polymer.jld2")
@@ -173,16 +211,61 @@ function compare_general_xyz()
     # [0.0, -1.2210483735231037e-9, 0.0, -1.7117963713175754e-9]
 
     let
-        n = 400
+        n = 600
         println(sig_gen[n][1, :, :] .- sigx_xyz[n])
 
         # See debug.jl for comparing the whole struct 
         # for gamma
-        println(gam_gen[n][1, 2, 1, 1, :] .- gam_xyz[n][1, 2, 1, 1, :]) # xxxx
-        println(gam_gen[n][11, 2, 1, 1, :] .- gam_xyz[n][10, 2, 1, 1, :]) # xyxy
+        for gen_index in 1:81
+            xyz_index = XYZIndex_from_GenIndex(gen_index)
+            if(xyz_index != -1)
+                println(gam_gen[n][gen_index, 2, 1, 1, :] .- gam_xyz[n][xyz_index, 2, 1, 1, :])
+            end
+        end
+        # println(gam_gen[n][1, 2, 1, 1, :] .- gam_xyz[n][1, 2, 1, 1, :]) # xxxx
+        # println(gam_gen[n][11, 2, 1, 1, :] .- gam_xyz[n][10, 2, 1, 1, :]) # xyxy
     end
 
 end
 
+######################
+## Temperature test ##
+######################
 
-main()
+using SpinFRGLattices
+using SpinFRGLattices.SimpleCubic
+
+System = getPolymer(2)
+
+anisotropy = zeros(System.Npairs, 3)
+for Rij = 1:System.Npairs
+    anisotropy[Rij, :] = [-0.2, 3.0, 1.0]
+end
+
+Par = PMFRG_xyz.Params(System, N = 8, temp_max = 10000.0, temp_min = 1.0, accuracy = 1e-10)
+
+let
+    sol, saved_values = PMFRG_xyz.SolveFRG(Par, anisotropy)
+    save_object(
+        "higT_polymer.jld2",
+        [
+            (saved_values.saveval[n], exp(saved_values.t[n])) for
+            n = 1:length(saved_values.t)
+        ],
+    )
+end
+
+## plots
+data_low = load_object("lowT_polymer.jld2")
+data_hig = load_object("higT_polymer.jld2")
+
+T_low = [data_low[n][2] for n in eachindex(data_low)]
+T_hig = [data_hig[n][2] for n in eachindex(data_hig)]
+
+chi_low = [data_low[n][1].Chi_z[2] for n in eachindex(data_low)]
+chi_hig = [data_hig[n][1].Chi_z[2] for n in eachindex(data_hig)]
+
+T_hig[300]
+
+(chi_low[1] - chi_hig[300]) / (chi_low[1] + chi_hig[300])
+(chi_low[600] - chi_hig[600]) / (chi_low[600] + chi_hig[600])
